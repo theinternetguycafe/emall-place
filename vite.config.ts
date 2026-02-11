@@ -11,7 +11,5 @@ export default defineConfig({
     },
   },
   // For GitHub Pages deployment, set base to your repository name
-  // Example: base: '/emall-place/'
-  // For local development, keep it as '/'
   base: process.env.NODE_ENV === 'production' ? '/emall-place/' : '/',
 })
