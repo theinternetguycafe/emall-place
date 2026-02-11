@@ -6,6 +6,7 @@ import { Category } from '../types'
 import { uploadProductImage } from '../lib/storage'
 import { Save, X, Upload, Loader2, ArrowLeft, Image as ImageIcon, Trash2 } from 'lucide-react'
 import ErrorAlert from '../components/ErrorAlert'
+import SuccessAlert from '../components/SuccessAlert'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -18,6 +19,7 @@ export default function ProductForm() {
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(!!id)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [images, setImages] = useState<File[]>([])
   const [imagePreview, setImagePreview] = useState<string[]>([])
@@ -83,6 +85,7 @@ export default function ProductForm() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setSuccess(null)
 
     try {
       const { data: store, error: sError } = await supabase
@@ -131,7 +134,13 @@ export default function ProductForm() {
         }
       }
 
-      navigate('/seller')
+      // Show success message
+      setSuccess(id ? 'Product updated successfully!' : 'Product published successfully!')
+      
+      // Navigate after a short delay to show the success message
+      setTimeout(() => {
+        navigate('/seller')
+      }, 1500)
     } catch (err: any) {
       console.error('Error saving product:', err)
       setError(err.message || 'Failed to save product. Please check all fields.')
@@ -167,6 +176,7 @@ export default function ProductForm() {
       </div>
 
       {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
+      {success && <SuccessAlert message={success} onClose={() => setSuccess(null)} />}
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-7 space-y-8">
