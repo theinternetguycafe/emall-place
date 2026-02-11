@@ -41,11 +41,16 @@ export default function SellerDashboard() {
       
       const [pRes, oRes] = await Promise.all([
         supabase.from('products').select('*, product_images(*)').eq('seller_store_id', storeData.id).order('created_at', { ascending: false }),
-        supabase.from('order_items').select('*, orders(*, profiles(full_name)), products(title)').eq('seller_store_id', storeData.id).order('created_at', { ascending: false })
+        supabase.from('order_items').select('*, orders(*, profiles(full_name)), products(title)').eq('seller_store_id', storeData.id).order('id', { ascending: false })
       ])
 
       if (pRes.data) setProducts(pRes.data)
-      if (oRes.data) setOrderItems(oRes.data)
+      if (oRes.error) {
+        console.error('Error fetching order items:', oRes.error)
+        setOrderItems([]) // fail gracefully
+      } else {
+        setOrderItems(oRes.data ?? [])
+      }
     }
     setLoading(false)
   }
