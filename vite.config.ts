@@ -10,6 +10,5 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  // For GitHub Pages deployment, set base to your repository name
-  base: process.env.NODE_ENV === 'production' ? '/emall-place/' : '/',
+  base: '/emall-place/',
 })
