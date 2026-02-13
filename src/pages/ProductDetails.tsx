@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCart } from '../contexts/CartContext'
+import { useToast } from '../contexts/ToastContext'
 import { Product } from '../types'
 import { ShoppingCart, ArrowLeft, Store, ShieldCheck, Truck, RefreshCw } from 'lucide-react'
 import ProductImage from '../components/ProductImage'
@@ -15,6 +16,7 @@ export default function ProductDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { addToCart } = useCart()
+  const { addToast } = useToast()
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -49,6 +51,7 @@ export default function ProductDetails() {
     if (!product) return
     setAdding(true)
     addToCart(product)
+    addToast(`${product.title} added to your bag 🛍️`, 'success')
     setTimeout(() => setAdding(false), 800)
   }
 

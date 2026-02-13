@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../contexts/ToastContext'
 import { CheckCircle, Loader2, ShoppingBag, Home } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -8,6 +9,7 @@ import { Button } from '../components/ui/Button'
 export default function CheckoutSuccess() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { addToast } = useToast()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -43,6 +45,7 @@ export default function CheckoutSuccess() {
       if (isPaid) {
         setSuccess(true)
         setLoading(false)
+        addToast('Payment received! 🎉', 'success')
       } else {
         setError('Payment is still processing. Please wait...')
         setLoading(false)
@@ -77,7 +80,7 @@ export default function CheckoutSuccess() {
             <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Loader2 className="animate-spin h-8 w-8 text-rose-600" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900 mb-4">Payment Verification Failed</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-4">Payment Issue</h2>
             <p className="text-stone-500 font-medium mb-8">{error}</p>
             <Button
               onClick={handleContinueShopping}
@@ -102,10 +105,10 @@ export default function CheckoutSuccess() {
             </div>
             <div>
               <h1 className="text-5xl font-black text-slate-900 tracking-tight mb-2">
-                {success ? 'Payment Successful!' : 'Order Confirmed'}
+                {success ? 'All Set!' : 'Order Received'}
               </h1>
               <p className="text-stone-500 font-medium">
-                {success ? 'Your payment has been processed successfully.' : 'Your order has been confirmed and is being processed.'}
+                {success ? 'Your payment went through.' : 'Your order is being processed.'}
               </p>
             </div>
           </div>
@@ -115,7 +118,7 @@ export default function CheckoutSuccess() {
         <Card className="p-8 rounded-[2rem] border-stone-100 shadow-sm bg-white">
           <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
             <ShoppingBag className="h-6 w-6 text-slate-900" />
-            Order Details
+            Your Order
           </h2>
           <div className="space-y-4">
             <div className="flex justify-between">

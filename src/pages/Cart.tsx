@@ -1,13 +1,31 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../contexts/CartContext'
+import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 
 export default function Cart() {
   const { items, removeFromCart, updateQuantity, totalAmount } = useCart()
+  const { user } = useAuth()
+  const { addToast } = useToast()
   const navigate = useNavigate()
+
+  const handleRemoveFromCart = (productId: string) => {
+    removeFromCart(productId)
+    addToast('Removed from your cart', 'info')
+  }
+
+  const handleUpdateQuantity = (productId: string, newQuantity: number) => {
+    if (newQuantity < 1) {
+      handleRemoveFromCart(productId)
+      return
+    }
+    updateQuantity(productId, newQuantity)
+    addToast('Cart updated', 'info')
+  }
 
   if (items.length === 0) {
     return (
@@ -18,13 +36,13 @@ export default function Cart() {
           </div>
         </div>
         <h2 className="text-4xl font-black text-slate-900 mb-4 tracking-tight">Your cart is empty</h2>
-        <p className="text-stone-500 mb-10 text-lg max-w-md mx-auto">Discover unique products from independent sellers across the country.</p>
+        <p className="text-stone-500 mb-10 text-lg max-w-md mx-auto">Browse our collection of unique items from independent sellers.</p>
         <Button
           size="lg"
           onClick={() => navigate('/shop')}
           className="rounded-full px-10"
         >
-          Start Shopping
+          Continue Shopping
         </Button>
       </div>
     )
@@ -33,8 +51,8 @@ export default function Cart() {
   return (
     <div className="container mx-auto px-4 py-16">
       <div className="flex items-baseline gap-4 mb-12">
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Shopping Bag</h1>
-        <span className="text-stone-400 text-lg font-medium">{items.length} items</span>
+        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Your Bag</h1>
+        <span className="text-stone-400 text-lg font-medium">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -67,7 +85,7 @@ export default function Cart() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeFromCart(item.product.id)}
+                        onClick={() => handleRemoveFromCart(item.product.id)}
                         className="text-stone-400 hover:text-rose-600 -mt-2 -mr-2"
                       >
                         <Trash2 className="h-5 w-5" />
@@ -84,7 +102,7 @@ export default function Cart() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 rounded-full"
-                        onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                        onClick={() => handleUpdateQuantity(item.product.id, item.quantity - 1)}
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
@@ -93,7 +111,7 @@ export default function Cart() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 rounded-full"
-                        onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                        onClick={() => handleUpdateQuantity(item.product.id, item.quantity + 1)}
                       >
                         <Plus className="h-3 w-3" />
                       </Button>
@@ -113,7 +131,7 @@ export default function Cart() {
 
         <div className="lg:col-span-4">
           <Card className="sticky top-24 border-2 border-slate-900 bg-white p-8">
-            <h2 className="text-2xl font-black mb-8 text-slate-900 tracking-tight">Order Summary</h2>
+            <h2 className="text-2xl font-black mb-8 text-slate-900 tracking-tight">Summary</h2>
             <div className="space-y-6 mb-10">
               <div className="flex justify-between text-stone-500 font-medium">
                 <span>Subtotal</span>
@@ -121,32 +139,39 @@ export default function Cart() {
               </div>
               <div className="flex justify-between text-stone-500 font-medium">
                 <span>Shipping</span>
-                <span className="text-emerald-600 font-bold uppercase text-sm tracking-widest">Calculated at next step</span>
+                <span className="text-emerald-600 font-bold uppercase text-sm tracking-widest">At checkout</span>
               </div>
               <div className="h-px bg-stone-100" />
               <div className="flex justify-between items-baseline">
-                <span className="text-lg font-bold text-slate-900">Estimated Total</span>
+                <span className="text-lg font-bold text-slate-900">Total</span>
                 <span className="text-3xl font-black text-slate-900">R {totalAmount.toLocaleString()}</span>
               </div>
             </div>
             
             <Button
               size="lg"
-              onClick={() => navigate('/checkout')}
+              onClick={() => {
+                if (!user) {
+                  addToast('Please sign in to continue to checkout', 'info')
+                  navigate('/auth')
+                  return
+                }
+                navigate('/checkout')
+              }}
               className="w-full rounded-full py-8 text-lg group"
             >
-              Checkout Now
+              Pay Now
               <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
             
             <div className="mt-8 space-y-4">
               <div className="flex items-center gap-3 text-xs text-stone-400 font-medium uppercase tracking-wider justify-center">
                 <span className="w-8 h-px bg-stone-100" />
-                <span>Secure Payments</span>
+                <span>Secure</span>
                 <span className="w-8 h-px bg-stone-100" />
               </div>
               <p className="text-[10px] text-center text-stone-400 italic leading-relaxed">
-                By proceeding to checkout, you agree to our terms of service. All transactions are encrypted and secure.
+                All transactions are encrypted and secure.
               </p>
             </div>
           </Card>

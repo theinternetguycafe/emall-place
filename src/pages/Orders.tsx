@@ -84,12 +84,12 @@ export default function Orders() {
           <nav className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-stone-400 mb-6">
             <Link to="/" className="hover:text-slate-900 transition-colors">Home</Link>
             <ChevronRight className="h-3 w-3" />
-            <span className="text-slate-900">Purchase History</span>
+            <span className="text-slate-900">My Orders</span>
           </nav>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              <h1 className="text-5xl font-black tracking-tighter text-slate-900 uppercase">The Archive</h1>
-              <p className="text-stone-500 mt-2 font-medium">Tracking your curated acquisitions and orders.</p>
+              <h1 className="text-5xl font-black tracking-tighter text-slate-900 uppercase">Your Orders</h1>
+              <p className="text-stone-500 mt-2 font-medium">View and track your purchases.</p>
             </div>
             <Link to="/shop">
               <Button variant="outline" className="rounded-full border-stone-200">
@@ -106,11 +106,11 @@ export default function Orders() {
             <div className="w-20 h-20 bg-stone-50 rounded-full flex items-center justify-center mx-auto mb-8">
               <Package className="h-8 w-8 text-stone-300" />
             </div>
-            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">No Acquisitions Yet</h3>
-            <p className="text-stone-500 mt-2 max-w-xs mx-auto">Your collection is waiting to be started. Explore the marketplace to find unique items.</p>
+            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">No Orders Yet</h3>
+            <p className="text-stone-500 mt-2 max-w-xs mx-auto">Start shopping to see your orders here.</p>
             <Link to="/shop" className="mt-10 inline-block">
               <Button size="lg" className="rounded-2xl px-12 shadow-xl shadow-slate-200">
-                Browse Collection
+                Start Shopping
               </Button>
             </Link>
           </Card>
@@ -123,18 +123,18 @@ export default function Orders() {
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div className="flex flex-wrap gap-8">
                       <div className="space-y-1">
-                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Order Reference</p>
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Order Number</p>
                         <p className="text-sm font-bold font-mono">#{order.id.slice(0, 12).toUpperCase()}</p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Placed On</p>
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Date</p>
                         <div className="flex items-center gap-2">
                           <Calendar className="h-3 w-3 text-stone-500" />
                           <p className="text-sm font-bold">{new Date(order.created_at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Total Investment</p>
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Total</p>
                         <p className="text-lg font-black italic">R {order.total_amount.toFixed(2)}</p>
                       </div>
                     </div>
@@ -169,7 +169,7 @@ export default function Orders() {
                                 <div>
                                   <h3 className="text-lg font-bold text-slate-900 mb-1">{item.product?.title || 'Unknown Product'}</h3>
                                   <div className="flex items-center gap-4">
-                                    <p className="text-sm text-stone-500 font-medium">Quantity: {item.qty}</p>
+                                    <p className="text-sm text-stone-500 font-medium">Qty: {item.qty}</p>
                                     <span className="h-1 w-1 rounded-full bg-stone-300"></span>
                                     <Badge variant="outline" className="text-[10px] font-bold border-stone-100 text-stone-400 py-0 px-2 uppercase tracking-tighter">
                                       {item.item_status}
@@ -198,10 +198,10 @@ export default function Orders() {
                 <div className="bg-stone-50 px-8 py-4 border-t border-stone-100 flex justify-between items-center">
                    <div className="flex items-center gap-2 text-stone-400">
                       <Receipt className="h-4 w-4" />
-                      <span className="text-[10px] font-bold uppercase tracking-widest">Digital Invoice Available</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Invoice</span>
                    </div>
                    <Button variant="ghost" size="sm" className="text-slate-900 font-bold uppercase tracking-widest text-[10px]">
-                      Download Receipt
+                      Download
                    </Button>
                 </div>
               </Card>

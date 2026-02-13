@@ -12,40 +12,103 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Cache profile in localStorage for instant loading
+const PROFILE_CACHE_KEY = 'cached_profile'
+
+function getCachedProfile(): Profile | null {
+  try {
+    const cached = localStorage.getItem(PROFILE_CACHE_KEY)
+    if (cached) {
+      return JSON.parse(cached)
+    }
+  } catch (e) {
+    console.warn('[AuthContext] Failed to read cached profile:', e)
+  }
+  return null
+}
+
+function setCachedProfile(profile: Profile | null) {
+  try {
+    if (profile) {
+      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile))
+    } else {
+      localStorage.removeItem(PROFILE_CACHE_KEY)
+    }
+  } catch (e) {
+    console.warn('[AuthContext] Failed to cache profile:', e)
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(() => getCachedProfile())
   const [loading, setLoading] = useState(true)
   const fetchingProfileFor = useRef<string | null>(null)
+  const mounted = useRef(true)
 
   useEffect(() => {
-    // Single point of truth for auth state
+    mounted.current = true
+    
+    // Check for existing session immediately on mount
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        console.log('[AuthContext] Initial session check:', session?.user?.id)
+        
+        if (!mounted.current) return
+        
+        if (session?.user) {
+          setUser(session.user)
+          // Check if cached profile matches this user
+          const cached = getCachedProfile()
+          if (cached && cached.id === session.user.id) {
+            console.log('[AuthContext] Using cached profile for instant load')
+            setProfile(cached)
+            setLoading(false) // Set loading false immediately with cached data
+          }
+          // Always fetch fresh profile in background (don't await)
+          fetchProfile(session.user.id, !!cached) // pass true if we have cache to not block UI
+        } else {
+          setLoading(false)
+        }
+      } catch (e) {
+        console.error('[AuthContext] Initial session check failed:', e)
+        if (mounted.current) setLoading(false)
+      }
+    }
+
+    initializeAuth()
+
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`[AuthContext] Event: ${event}`, session?.user?.id)
       
       if (session?.user) {
         setUser(session.user)
-        // If we don't have a profile OR the user has changed, fetch it
-        if (!profile || profile.id !== session.user.id) {
-          // If we're already fetching for this user, don't start again
-          if (fetchingProfileFor.current === session.user.id) {
-            console.log(`[AuthContext] Already fetching profile for ${session.user.id}, skipping redundant call`)
-            return
-          }
-          
-          // For SIGNED_IN events (like after signup), wait a moment for the DB trigger
-          if (event === 'SIGNED_IN') {
-            console.log('[AuthContext] SIGNED_IN detected, waiting 1s for trigger...')
-            await new Promise(resolve => setTimeout(resolve, 1000))
-          }
-          
-          await fetchProfile(session.user.id)
-        } else {
+        
+        // Skip if already fetching for this user
+        if (fetchingProfileFor.current === session.user.id) {
+          return
+        }
+        
+        // For SIGNED_IN events, use cached profile immediately if available
+        const cached = getCachedProfile()
+        if (cached && cached.id === session.user.id) {
+          setProfile(cached)
           setLoading(false)
         }
+        
+        // Fetch fresh profile (with small delay only for new signups)
+        if (event === 'SIGNED_IN' && !cached) {
+          // Only wait for DB trigger on fresh signup
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+        
+        await fetchProfile(session.user.id, !!cached)
       } else {
         setUser(null)
         setProfile(null)
+        setCachedProfile(null)
         setLoading(false)
         fetchingProfileFor.current = null
       }
@@ -53,17 +116,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (event === 'SIGNED_OUT') {
         setUser(null)
         setProfile(null)
+        setCachedProfile(null)
         setLoading(false)
         fetchingProfileFor.current = null
       }
     })
 
     return () => {
+      mounted.current = false
       subscription.unsubscribe()
     }
-  }, []) // Remove profile dependency to prevent infinite loop
+  }, [])
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, isBackgroundRefresh = false) => {
     if (fetchingProfileFor.current === userId) {
       console.log('[AuthContext] Already fetching profile, skipping')
       return
@@ -71,21 +136,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     try {
       fetchingProfileFor.current = userId
-      setLoading(true)
-      console.log('[AuthContext] fetchProfile START for:', userId)
+      // Only set loading true if we don't have cached data (not a background refresh)
+      if (!isBackgroundRefresh) {
+        setLoading(true)
+      }
+      console.log('[AuthContext] fetchProfile START for:', userId, isBackgroundRefresh ? '(background)' : '')
       
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
-      )
-      
-      const dbPromise = supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle()
-      
-      const { data, error } = await Promise.race([dbPromise, timeoutPromise]) as any
+
+      if (!mounted.current) return
 
       if (error) {
         console.error('[AuthContext] fetchProfile DB ERROR:', error)
@@ -94,63 +157,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await signOut()
           return
         }
-        // Don't throw, just log and continue
-        console.error('[AuthContext] Continuing despite error:', error.message)
       }
 
       if (!data) {
         // Profile doesn't exist, create it (safety net)
         console.log('[AuthContext] Profile missing in DB, attempting safety net creation...')
-        try {
-          const { data: { user: userData } } = await supabase.auth.getUser()
-          if (userData) {
-            const { data: newProfile, error: createError } = await supabase
-              .from('profiles')
-              .upsert({
-                id: userData.id,
-                full_name: userData.user_metadata.full_name || '',
-                role: userData.user_metadata.role || 'buyer'
-              })
-              .select()
-              .maybeSingle()
-            
-            if (!createError && newProfile) {
-              console.log('[AuthContext] Profile created/synced via safety net')
-              setProfile(newProfile)
-            } else {
-              console.error('[AuthContext] Safety net failed:', createError)
-              // Create a minimal profile in memory to prevent infinite loading
-              setProfile({
-                id: userData.id,
-                full_name: userData.user_metadata.full_name || '',
-                role: userData.user_metadata.role || 'buyer',
-                phone: null,
-                created_at: new Date().toISOString()
-              })
-            }
-          }
-        } catch (safetyNetError) {
-          console.error('[AuthContext] Safety net exception:', safetyNetError)
-          // Create a minimal profile in memory to prevent infinite loading
-          const { data: { user: userData } } = await supabase.auth.getUser()
-          if (userData) {
-            setProfile({
+        const { data: { user: userData } } = await supabase.auth.getUser()
+        if (userData) {
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: userData.id,
+              full_name: userData.user_metadata.full_name || '',
+              role: userData.user_metadata.role || 'buyer'
+            })
+            .select()
+            .maybeSingle()
+          
+          if (!createError && newProfile) {
+            console.log('[AuthContext] Profile created/synced via safety net')
+            setProfile(newProfile)
+            setCachedProfile(newProfile)
+          } else {
+            // Create a minimal profile in memory
+            const fallbackProfile: Profile = {
               id: userData.id,
               full_name: userData.user_metadata.full_name || '',
               role: userData.user_metadata.role || 'buyer',
               phone: null,
               created_at: new Date().toISOString()
-            })
+            }
+            setProfile(fallbackProfile)
           }
         }
       } else {
         console.log('[AuthContext] Profile loaded successfully, role:', data.role)
         setProfile(data)
+        setCachedProfile(data)
       }
     } catch (error) {
       console.error('[AuthContext] Critical error in fetchProfile:', error)
-      // Ensure loading is set to false even on error
-      setLoading(false)
+      // On error, create a fallback profile from user metadata
+      try {
+        const { data: { user: userData } } = await supabase.auth.getUser()
+        if (userData && mounted.current) {
+          const fallbackProfile: Profile = {
+            id: userData.id,
+            full_name: userData.user_metadata.full_name || '',
+            role: userData.user_metadata.role || 'buyer',
+            phone: null,
+            created_at: new Date().toISOString()
+          }
+          console.log('[AuthContext] Using fallback profile due to error')
+          setProfile(fallbackProfile)
+        }
+      } catch (e) {
+        console.error('[AuthContext] Failed to get user for fallback:', e)
+      }
     } finally {
       console.log('[AuthContext] fetchProfile FINISHED for:', userId)
       fetchingProfileFor.current = null
@@ -163,6 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
+    setCachedProfile(null)
     setLoading(false)
   }
 

@@ -1,7 +1,9 @@
 import { HashRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { CartProvider } from './contexts/CartContext'
+import { ToastProvider } from './contexts/ToastContext'
 import Layout from './components/Layout'
+import ScrollToTop from './components/ScrollToTop'
 import Home from './pages/Home'
 import Auth from './pages/Auth'
 import Shop from './pages/Shop'
@@ -23,9 +25,11 @@ function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <Router>
-          <Layout>
-            <Routes>
+        <ToastProvider>
+          <Router>
+            <ScrollToTop />
+            <Layout>
+              <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/shop" element={<Shop />} />
@@ -35,7 +39,7 @@ function App() {
               <Route 
                 path="/checkout" 
                 element={
-                  <ProtectedRoute allowedRoles={['buyer', 'admin']}>
+                  <ProtectedRoute>
                     <Checkout />
                   </ProtectedRoute>
                 } 
@@ -74,15 +78,13 @@ function App() {
                 } 
               />
             </Routes>
-          </Layout>
-        </Router>
+            </Layout>
+          </Router>
+        </ToastProvider>
       </CartProvider>
     </AuthProvider>
   )
 }
-
-
-
 
 
 

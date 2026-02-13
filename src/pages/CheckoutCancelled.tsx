@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../contexts/ToastContext'
 import { XCircle, Loader2, ShoppingBag, Home, RefreshCw } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -8,6 +9,7 @@ import { Button } from '../components/ui/Button'
 export default function CheckoutCancelled() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { addToast } = useToast()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,13 +30,14 @@ export default function CheckoutCancelled() {
         .eq('id', orderId)
 
       if (error) {
-        setError('Failed to cancel order. Please contact support.')
+        setError('Failed to cancel order. Please try again.')
       } else {
         setLoading(false)
+        addToast('Payment cancelled', 'info')
       }
     } catch (error) {
       console.error('Error cancelling order:', error)
-      setError('An error occurred while cancelling your order.')
+      setError('Something went wrong. Please try again.')
       setLoading(false)
     }
   }
@@ -101,9 +104,9 @@ export default function CheckoutCancelled() {
               <XCircle className="h-10 w-10 text-amber-600" />
             </div>
             <div>
-              <h1 className="text-5xl font-black text-slate-900 tracking-tight mb-2">Payment Cancelled</h1>
+              <h1 className="text-5xl font-black text-slate-900 tracking-tight mb-2">Oops, Payment Cancelled</h1>
               <p className="text-stone-500 font-medium">
-                Your payment has been cancelled. You can try again or continue shopping.
+                No worries. You can try again or keep shopping.
               </p>
             </div>
           </div>
@@ -113,7 +116,7 @@ export default function CheckoutCancelled() {
         <Card className="p-8 rounded-[2rem] border-stone-100 shadow-sm bg-white">
           <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
             <ShoppingBag className="h-6 w-6 text-slate-900" />
-            Order Details
+            Your Order
           </h2>
           <div className="space-y-4">
             <div className="flex justify-between">

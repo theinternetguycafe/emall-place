@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import { Lock, Mail, User, Store, ArrowRight, Loader2, ShieldCheck } from 'lucide-react'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -15,6 +16,7 @@ export default function Auth() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user, loading: authLoading } = useAuth()
+  const { addToast } = useToast()
   const [mode, setMode] = useState<AuthMode>(searchParams.get('signup') === 'true' ? 'signup' : 'signin')
   const [role, setRole] = useState<UserRole>('buyer')
   const [loading, setLoading] = useState(false)
@@ -59,7 +61,7 @@ export default function Auth() {
     // Check cooldown period
     if (cooldownUntil && Date.now() < cooldownUntil) {
       const remainingSeconds = Math.ceil((cooldownUntil - Date.now()) / 1000)
-      setError(`Too many attempts. Please wait ${remainingSeconds} seconds before trying again.`)
+      setError(`Wait ${remainingSeconds}s before trying again.`)
       return
     }
 
@@ -89,13 +91,14 @@ export default function Auth() {
           if (signUpError.status === 429) {
             const cooldownTime = 60 * 1000 
             setCooldownUntil(Date.now() + cooldownTime)
-            throw new Error('Rate limit exceeded. Please wait 1 minute.')
+            throw new Error('Too many attempts. Please wait a moment.')
           }
           throw signUpError
         }
 
         if (data.session) {
           console.log('Registration successful, redirecting...')
+          addToast('Account created! Welcome! 🎉', 'success')
           navigate('/')
         } else {
           console.log('Registration successful, verification required.')
@@ -112,15 +115,16 @@ export default function Auth() {
           if (signInError.status === 429) {
             const cooldownTime = 30 * 1000 // 30 seconds cooldown
             setCooldownUntil(Date.now() + cooldownTime)
-            throw new Error('Too many sign in attempts. Please wait a few minutes and try again.')
+            throw new Error('Too many attempts. Please wait a moment.')
           }
           throw signInError
         }
+        addToast('Welcome back! 👋', 'success')
         navigate('/')
       }
     } catch (err: any) {
       console.error('Auth error:', err)
-      setError(err.message || 'An error occurred during authentication.')
+      setError(err.message || 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
       isSubmitting.current = false
@@ -135,12 +139,12 @@ export default function Auth() {
             <ShieldCheck size={32} />
           </div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">
-            {mode === 'signin' ? 'Welcome Back' : 'Join the Collective'}
+            {mode === 'signin' ? 'Sign In' : 'Create Account'}
           </h1>
           <p className="text-stone-500 font-medium">
             {mode === 'signin' 
-              ? 'Access your premium marketplace experience.' 
-              : 'Start your journey as a buyer or independent seller.'}
+              ? 'Access your account and shop.' 
+              : 'Join as a buyer or seller.'}
           </p>
         </div>
 
@@ -193,7 +197,7 @@ export default function Auth() {
                 </div>
 
                 <Input
-                  label="Full Name"
+                  label="Name"
                   placeholder="John Doe"
                   required
                   value={formData.fullName}
@@ -213,7 +217,7 @@ export default function Auth() {
             )}
 
             <Input
-              label="Email Address"
+              label="Email"
               type="email"
               placeholder="name@example.com"
               required
@@ -241,7 +245,7 @@ export default function Auth() {
                 <span>Wait {Math.ceil((cooldownUntil - Date.now()) / 1000)}s</span>
               ) : (
                 <div className="flex items-center gap-3">
-                  <span>{mode === 'signin' ? 'Enter Marketplace' : 'Create Account'}</span>
+                  <span>{mode === 'signin' ? 'Sign In' : 'Create'}</span>
                   <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </div>
               )}
@@ -250,8 +254,8 @@ export default function Auth() {
 
           <p className="text-center text-xs text-stone-400 mt-8 font-medium">
             {mode === 'signin' 
-              ? "Don't have an account? Use the register tab above." 
-              : "Already part of the collective? Use the sign in tab above."}
+              ? "Don't have an account? Click register above." 
+              : "Already have an account? Click sign in above."}
           </p>
         </Card>
       </div>

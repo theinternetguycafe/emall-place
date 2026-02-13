@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useCart } from '../contexts/CartContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import { supabase } from '../lib/supabase'
-import { MockPaymentProvider } from '../lib/payments'
-import { createPayFastPayment, verifyPaymentStatus } from '../lib/payfast'
-import { ShieldCheck, Loader2, CreditCard, ArrowLeft, Lock, Zap } from 'lucide-react'
+import { createYocoPaymentLink, verifyYocoPaymentStatus } from '../lib/yoco'
+import { generateSnapScanQR, verifySnapScanPaymentStatus } from '../lib/snapscan'
+import { ShieldCheck, Loader2, CreditCard, ArrowLeft, Lock, Zap, QrCode } from 'lucide-react'
 import ErrorAlert from '../components/ErrorAlert'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -13,23 +14,34 @@ import { Input } from '../components/ui/Input'
 
 export default function Checkout() {
   const { items, totalAmount, clearCart } = useCart()
-  const { user, profile } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
+  const { addToast } = useToast()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<'mock' | 'payfast'>('mock')
+  const [paymentMethod, setPaymentMethod] = useState<'yoco' | 'snapscan'>('yoco')
   const [orderId, setOrderId] = useState<string | null>(null)
   const [polling, setPolling] = useState(false)
+  const [snapScanQR, setSnapScanQR] = useState<string | null>(null)
+  const [showSnapScanQR, setShowSnapScanQR] = useState(false)
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
 
+    // Double-check auth state (should not happen due to redirect above, but safety check)
+    if (authLoading) {
+      addToast('Please wait, verifying your session...', 'info')
+      return
+    }
+
     if (!user) {
       navigate('/auth')
       return
     }
+
+    addToast('Processing payment...', 'info')
 
     setLoading(true)
     try {
@@ -55,7 +67,8 @@ export default function Checkout() {
           total_amount: totalAmount,
           total_commission: totalCommission,
           status: 'pending_payment',
-          payment_status: 'pending'
+          payment_status: 'pending',
+          payment_method: paymentMethod
         })
         .select()
         .single()
@@ -80,63 +93,61 @@ export default function Checkout() {
       if (itemsError) throw new Error(`Failed to save order items: ${itemsError.message}`)
 
       // Step 2: Process payment based on selected method
-      if (paymentMethod === 'payfast') {
-        // PayFast Integration
-        const { redirectUrl, error: paymentError } = await createPayFastPayment(
+      if (paymentMethod === 'yoco') {
+        // Yoco Integration - Redirect to payment link
+        const { redirectUrl, error: paymentError } = await createYocoPaymentLink(
           order.id,
           totalAmount,
           calculatedItems,
-          user.email
+          user.email,
+          profile?.full_name
         )
 
         if (paymentError) {
           throw new Error(paymentError)
         }
 
-        // Redirect to PayFast
-        console.log('[Checkout] Redirecting to PayFast:', redirectUrl)
+        console.log('[Checkout] Redirecting to Yoco:', redirectUrl)
         window.location.href = redirectUrl
-      } else {
-        // Mock Payment (existing flow)
-        const payment = await MockPaymentProvider.processPayment(totalAmount, { orderId: order.id })
+      } else if (paymentMethod === 'snapscan') {
+        // SnapScan Integration - Generate QR code for polling
+        const { qrCode, transactionId, error: qrError } = await generateSnapScanQR(
+          order.id,
+          totalAmount,
+          calculatedItems
+        )
 
-        if (payment.success) {
-          const { error: updateError } = await supabase
-            .from('orders')
-            .update({ payment_status: 'paid', status: 'processing' })
-            .eq('id', order.id)
-
-          if (updateError) throw new Error(`Payment succeeded but order update failed: ${updateError.message}`)
-
-          clearCart()
-          navigate('/account/orders')
-        } else {
-          await supabase
-            .from('orders')
-            .update({ payment_status: 'failed' })
-            .eq('id', order.id)
-          setError('Payment failed. Please try again or use a different card.')
+        if (qrError) {
+          throw new Error(qrError)
         }
+
+        console.log('[Checkout] SnapScan QR generated:', transactionId)
+        setSnapScanQR(qrCode)
+        setShowSnapScanQR(true)
+        // Start polling for payment status
+        setTimeout(() => {
+          pollPaymentStatus(order.id, 'snapscan')
+        }, 1000)
       }
     } catch (err: any) {
       console.error('Checkout error:', err)
-      setError(err.message || 'An unexpected error occurred during checkout.')
+      setError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  // Poll for payment status when returning from PayFast
+  // Poll for payment status when returning from payment redirect
   useEffect(() => {
     const orderIdParam = searchParams.get('order_id')
     const status = searchParams.get('status')
 
     if (orderIdParam && status === 'success') {
-      pollPaymentStatus(orderIdParam)
+      pollPaymentStatus(orderIdParam, 'yoco')
     }
   }, [searchParams])
 
-  const pollPaymentStatus = async (orderId: string) => {
+  const pollPaymentStatus = async (orderId: string, method: 'yoco' | 'snapscan') => {
     setPolling(true)
     setError(null)
 
@@ -147,14 +158,27 @@ export default function Checkout() {
       const pollInterval = setInterval(async () => {
         attempts++
 
-        const { paid, status } = await verifyPaymentStatus(orderId)
+        let paid = false
+        let status = 'pending'
+
+        if (method === 'yoco') {
+          const result = await verifyYocoPaymentStatus(orderId)
+          paid = result.paid
+          status = result.status
+        } else if (method === 'snapscan') {
+          const result = await verifySnapScanPaymentStatus(orderId)
+          paid = result.paid
+          status = result.status
+        }
 
         console.log(`[Checkout] Poll attempt ${attempts}:`, { paid, status })
 
         if (paid) {
           clearInterval(pollInterval)
           setPolling(false)
+          setShowSnapScanQR(false)
           clearCart()
+          addToast('Payment received! 🎉', 'success')
           navigate('/account/orders')
           return
         }
@@ -162,26 +186,47 @@ export default function Checkout() {
         if (status === 'failed' || status === 'cancelled') {
           clearInterval(pollInterval)
           setPolling(false)
-          setError(status === 'failed' ? 'Payment failed. Please try again.' : 'Payment was cancelled.')
+          setShowSnapScanQR(false)
+          setError(status === 'failed' ? "Payment didn't go through." : 'Payment was cancelled.')
           return
         }
 
         if (attempts >= maxAttempts) {
           clearInterval(pollInterval)
           setPolling(false)
+          setShowSnapScanQR(false)
           setError('Payment verification timed out. Please contact support.')
         }
       }, 10000) // Poll every 10 seconds
 
     } catch (error) {
       setPolling(false)
+      setShowSnapScanQR(false)
       console.error('[Checkout] Polling error:', error)
-      setError('An error occurred while verifying payment.')
+      setError('Payment check failed. Please try again.')
     }
   }
 
   if (items.length === 0) {
     navigate('/shop')
+    return null
+  }
+
+  // Show loading state while auth is being determined
+  if (authLoading) {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-5xl">
+        <div className="flex flex-col items-center justify-center min-h-[50vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-900 mb-4" />
+          <p className="text-stone-500">Verifying your session...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Redirect to auth if not logged in
+  if (!user) {
+    navigate('/auth')
     return null
   }
 
@@ -209,15 +254,16 @@ export default function Checkout() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-7 space-y-8">
-          <section>
+          <form onSubmit={handleCheckout} className="space-y-8">
+            <section>
             <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm">1</div>
-              Shipping & Billing
+              Your Details
             </h2>
             <Card className="p-8">
               <div className="grid grid-cols-1 gap-6">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-stone-400 mb-2">Recipient Name</label>
+                  <label className="block text-xs font-black uppercase tracking-widest text-stone-400 mb-2">Name</label>
                   <Input
                     readOnly
                     value={profile?.full_name || ''}
@@ -225,7 +271,7 @@ export default function Checkout() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-stone-400 mb-2">Email Address</label>
+                  <label className="block text-xs font-black uppercase tracking-widest text-stone-400 mb-2">Email</label>
                   <Input
                     readOnly
                     value={user?.email || ''}
@@ -235,7 +281,7 @@ export default function Checkout() {
                 <div className="p-4 bg-stone-50 rounded-xl border border-stone-100 flex items-start gap-3">
                   <ShieldCheck className="text-emerald-600 mt-0.5" size={18} />
                   <p className="text-xs text-stone-500 leading-relaxed">
-                    Your account details are used for billing. To change these, please update your profile settings.
+                    We use this info for your order. Change it in your profile if needed.
                   </p>
                 </div>
               </div>
@@ -248,58 +294,84 @@ export default function Checkout() {
               Payment Method
             </h2>
             <Card className="p-8 border-2 border-slate-900">
-              <div className="flex gap-4 mb-6">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('mock')}
-                  className={`flex-1 p-4 rounded-xl border-2 transition-all ${
-                    paymentMethod === 'mock'
-                      ? 'border-slate-900 bg-slate-50'
-                      : 'border-stone-200 bg-white hover:border-slate-300'
-                  }`}
-                >
-                  <CreditCard className="h-5 w-5" />
-                  <div className="text-left">
-                    <p className="font-bold text-sm">Test Payment (Mock)</p>
-                    <p className="text-xs text-stone-500">Simulates payment flow</p>
+              {!showSnapScanQR ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('yoco')}
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${
+                        paymentMethod === 'yoco'
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-stone-200 bg-white hover:border-blue-300'
+                      }`}
+                    >
+                      <CreditCard className="h-5 w-5 mb-2 text-blue-600" />
+                      <p className="font-bold text-sm">Yoco</p>
+                      <p className="text-xs text-stone-500">Card & tap payment</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('snapscan')}
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${
+                        paymentMethod === 'snapscan'
+                          ? 'border-purple-600 bg-purple-50'
+                          : 'border-stone-200 bg-white hover:border-purple-300'
+                      }`}
+                    >
+                      <QrCode className="h-5 w-5 mb-2 text-purple-600" />
+                      <p className="font-bold text-sm">SnapScan</p>
+                      <p className="text-xs text-stone-500">QR scan payment</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled
+                      className="p-4 rounded-xl border-2 border-stone-200 bg-stone-50 text-left opacity-50 cursor-not-allowed"
+                    >
+                      <Zap className="h-5 w-5 mb-2 text-stone-400" />
+                      <p className="font-bold text-sm text-stone-400">PayFast</p>
+                      <p className="text-xs text-stone-400">Coming soon</p>
+                    </button>
                   </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('payfast')}
-                  className={`flex-1 p-4 rounded-xl border-2 transition-all ${
-                    paymentMethod === 'payfast'
-                      ? 'border-emerald-600 bg-emerald-50'
-                      : 'border-stone-200 bg-white hover:border-emerald-300'
-                  }`}
-                >
-                  <Zap className="h-5 w-5 text-emerald-600" />
-                  <div className="text-left">
-                    <p className="font-bold text-sm">Pay with PayFast</p>
-                    <p className="text-xs text-stone-500">Secure instant payment</p>
+
+                  <div className="p-4 bg-stone-50 rounded-xl border border-stone-100">
+                    <p className="text-sm text-stone-700">
+                      {paymentMethod === 'yoco' && '💳 Card or tap payment with Yoco'}
+                      {paymentMethod === 'snapscan' && '📱 Scan and pay with your SnapScan app'}
+                    </p>
                   </div>
-                </button>
-              </div>
-              <p className="text-sm text-stone-500 mb-0">
-                {paymentMethod === 'payfast'
-                  ? 'You will be redirected to PayFast to complete your transaction securely. After payment, you will be redirected back to complete your order.'
-                  : 'You will be redirected to our secure payment gateway to complete your transaction. We support all major South African cards.'
-                }
-              </p>
-              {paymentMethod === 'payfast' && (
-                <div className="mt-4 p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
-                  <p className="text-xs text-emerald-700 font-medium">
-                    <strong>Note:</strong> After completing payment on PayFast, you will be redirected back to this page to finalize your order.
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <QrCode className="h-12 w-12 mx-auto mb-4 text-purple-600" />
+                  <h3 className="text-xl font-bold mb-2">Scan to pay</h3>
+                  <p className="text-sm text-stone-500 mb-6">
+                    Open SnapScan and scan the QR code below
+                  </p>
+                  <div className="bg-white p-4 rounded-lg border border-stone-200 inline-block">
+                    <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="200" height="200" fill="white"/>
+                      <text x="50%" y="50%" textAnchor="middle" dy=".3em" fontSize="14" fill="#666">
+                        <tspan x="50%" dy=".3em">📱 SnapScan QR</tspan>
+                        <tspan x="50%" dy="1.2em" fontSize="10">{snapScanQR?.substring(0, 20)}...</tspan>
+                      </text>
+                    </svg>
+                  </div>
+                  <p className="text-xs text-stone-500 mt-4 max-w-sm mx-auto">
+                    Waiting for payment... (auto-redirects when done)
                   </p>
                 </div>
               )}
             </Card>
           </section>
+          </form>
         </div>
 
         <div className="lg:col-span-5">
           <Card className="sticky top-24 bg-stone-900 text-white p-8 border-none shadow-2xl">
-            <h2 className="text-2xl font-black mb-8 tracking-tight">Order Review</h2>
+            <h2 className="text-2xl font-black mb-8 tracking-tight">Summary</h2>
             
             <div className="space-y-4 mb-8 max-h-64 overflow-y-auto pr-2 scrollbar-hide">
               {items.map(item => (
@@ -315,12 +387,12 @@ export default function Checkout() {
             
             <div className="space-y-4 border-t border-white/10 pt-8">
               <div className="flex justify-between text-white/60 text-sm font-medium">
-                <span>Subtotal</span>
+                <span>Items</span>
                 <span>R {totalAmount.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-white/60 text-sm font-medium">
-                <span>Shipping</span>
-                <span className="text-emerald-400 font-bold uppercase text-[10px] tracking-widest">Calculated</span>
+                <span>Delivery</span>
+                <span className="text-emerald-400 font-bold uppercase text-[10px] tracking-widest">Free</span>
               </div>
               <div className="h-px bg-white/5 my-4" />
               <div className="flex justify-between items-baseline">
@@ -330,22 +402,30 @@ export default function Checkout() {
             </div>
 
             <Button
+              type="button"
               onClick={handleCheckout}
-              disabled={loading || polling}
+              disabled={loading || polling || authLoading}
               className="w-full bg-white text-slate-900 hover:bg-stone-200 py-8 text-lg font-black rounded-full mt-10 shadow-xl"
             >
-              {loading || polling ? (
+              {authLoading ? (
                 <div className="flex items-center gap-3">
                   <Loader2 className="animate-spin" size={20} />
-                  <span>{polling ? 'Verifying Payment...' : 'Processing'}</span>
+                  <span>Verifying session...</span>
+                </div>
+              ) : loading || polling ? (
+                <div className="flex items-center gap-3">
+                  <Loader2 className="animate-spin" size={20} />
+                  <span>{polling ? 'Waiting for payment...' : 'Processing'}</span>
                 </div>
               ) : (
-                <span>{paymentMethod === 'payfast' ? 'Pay with PayFast' : `Pay R ${totalAmount.toLocaleString()}`}</span>
+                <span>
+                  Pay Now - R {totalAmount.toLocaleString()}
+                </span>
               )}
             </Button>
             
             <p className="text-[10px] text-center text-white/30 uppercase tracking-widest font-bold mt-6">
-              Encrypted 256-bit SSL Connection
+              🔒 Your payment is secure
             </p>
           </Card>
         </div>

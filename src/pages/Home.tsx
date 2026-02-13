@@ -33,8 +33,15 @@ export default function Home() {
           .limit(6)
       ])
 
-      if (productsRes.data) setFeaturedProducts(productsRes.data)
-      if (categoriesRes.data) setCategories(categoriesRes.data)
+      console.log('[Home] Products response:', productsRes)
+      console.log('[Home] Categories response:', categoriesRes)
+
+      if (productsRes?.data) setFeaturedProducts(productsRes.data)
+      if (categoriesRes?.data) setCategories(categoriesRes.data)
+      
+      if (productsRes?.error) console.error('[Home] Products error:', productsRes.error)
+      if (categoriesRes?.error) console.error('[Home] Categories error:', categoriesRes.error)
+      
     } catch (error) {
       console.error('Error fetching home data:', error)
     } finally {
@@ -58,14 +65,14 @@ export default function Home() {
         <div className="container mx-auto px-4 relative z-10 text-white">
           <div className="max-w-4xl">
             <Badge variant="outline" className="text-white border-white/20 bg-white/10 backdrop-blur-md mb-8 py-2 px-6 rounded-full text-[10px] font-black tracking-[0.2em]">
-              ✨ The Curated Collective
+              🏪 Shop Premium Items
             </Badge>
             <h1 className="text-7xl md:text-[9rem] font-black leading-[0.85] tracking-tighter mb-10">
-              CRAFTED <br />
-              <span className="text-stone-400 italic">EXCELLENCE.</span>
+              Find Your <br />
+              <span className="text-stone-400 italic">Favorites.</span>
             </h1>
             <p className="text-xl text-stone-300 mb-12 leading-relaxed max-w-xl font-medium">
-              A refined marketplace connecting discerning customers with South Africa's most exceptional independent creators.
+              Shop handmade items from independent creators across South Africa. Quality products, fair prices.
             </p>
             <div className="flex flex-wrap gap-6">
               <Link to="/shop">
@@ -92,8 +99,8 @@ export default function Home() {
                 <ShieldCheck className="h-10 w-10" />
               </div>
               <div>
-                <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Secure Commerce</h3>
-                <p className="text-stone-400 text-sm font-medium leading-relaxed">Encrypted transactions via elite South African payment gateways.</p>
+                <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Secure Payments</h3>
+                <p className="text-stone-400 text-sm font-medium leading-relaxed">Your money is safe. We use trusted payment providers.</p>
               </div>
             </div>
             <div className="p-12 flex flex-col items-center text-center gap-6 group">
@@ -101,8 +108,8 @@ export default function Home() {
                 <Truck className="h-10 w-10" />
               </div>
               <div>
-                <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Rapid Logistics</h3>
-                <p className="text-stone-400 text-sm font-medium leading-relaxed">Direct, tracked delivery from artisan studios to your doorstep.</p>
+                <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Fast Delivery</h3>
+                <p className="text-stone-400 text-sm font-medium leading-relaxed">Tracked shipping straight to you.</p>
               </div>
             </div>
             <div className="p-12 flex flex-col items-center text-center gap-6 group">
@@ -110,8 +117,8 @@ export default function Home() {
                 <Star className="h-10 w-10" />
               </div>
               <div>
-                <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Verified Guilds</h3>
-                <p className="text-stone-400 text-sm font-medium leading-relaxed">Stringent vetting ensures only the highest quality merchant standards.</p>
+                <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Quality Items</h3>
+                <p className="text-stone-400 text-sm font-medium leading-relaxed">All sellers are checked. Only good stuff here.</p>
               </div>
             </div>
           </div>
@@ -122,8 +129,8 @@ export default function Home() {
       <section className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8 border-b border-stone-100 pb-12">
           <div className="max-w-2xl">
-            <Badge variant="outline" className="mb-4 border-stone-200 text-stone-400 rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest">Departments</Badge>
-            <h2 className="text-5xl font-black tracking-tight text-slate-900 uppercase leading-none">Curated <br /><span className="text-stone-300">Collections</span></h2>
+            <Badge variant="outline" className="mb-4 border-stone-200 text-stone-400 rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest">Shop</Badge>
+            <h2 className="text-5xl font-black tracking-tight text-slate-900 uppercase leading-none">Browse <br /><span className="text-stone-300">Categories</span></h2>
           </div>
           <Link to="/shop">
             <Button variant="outline" className="rounded-full px-8 py-6 font-black uppercase tracking-widest text-[10px] group">
@@ -157,8 +164,8 @@ export default function Home() {
       <section className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8 border-b border-stone-100 pb-12">
           <div className="max-w-2xl">
-            <Badge variant="outline" className="mb-4 border-stone-200 text-stone-400 rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest">Selection</Badge>
-            <h2 className="text-5xl font-black tracking-tight text-slate-900 uppercase leading-none">Editor's <br /><span className="text-stone-300">Choice</span></h2>
+            <Badge variant="outline" className="mb-4 border-stone-200 text-stone-400 rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest">Popular</Badge>
+            <h2 className="text-5xl font-black tracking-tight text-slate-900 uppercase leading-none">Popular <br /><span className="text-stone-300">Items</span></h2>
           </div>
           <Link to="/shop">
             <Button variant="outline" className="rounded-full px-8 py-6 font-black uppercase tracking-widest text-[10px] group">
@@ -199,7 +206,7 @@ export default function Home() {
                   {product.stock <= 5 && product.stock > 0 && (
                     <div className="absolute bottom-6 left-6">
                       <Badge variant="warning" className="rounded-full px-4 py-1.5 font-black uppercase tracking-widest text-[8px] shadow-xl">
-                        Limited Reserve
+                        Low Stock
                       </Badge>
                     </div>
                   )}
@@ -238,20 +245,20 @@ export default function Home() {
           </div>
           
           <div className="relative z-10 max-w-3xl mx-auto">
-            <Badge variant="outline" className="mb-8 border-white/10 text-stone-400 rounded-full px-6 py-2 text-[10px] font-black uppercase tracking-[0.3em] bg-white/5">The Guild</Badge>
-            <h2 className="text-5xl md:text-7xl font-black mb-10 leading-[0.9] uppercase tracking-tighter">Your Legacy, <br /><span className="text-stone-500 italic">Our Platform.</span></h2>
+            <Badge variant="outline" className="mb-8 border-white/10 text-stone-400 rounded-full px-6 py-2 text-[10px] font-black uppercase tracking-[0.3em] bg-white/5">Sell With Us</Badge>
+            <h2 className="text-5xl md:text-7xl font-black mb-10 leading-[0.9] uppercase tracking-tighter">Want to <br /><span className="text-stone-500 italic">Sell Here?</span></h2>
             <p className="text-xl text-stone-400 mb-16 font-medium leading-relaxed max-w-2xl mx-auto">
-              Elevate your artisan business with our premium merchant tools. We provide the infrastructure; you provide the craft.
+              We help independent creators sell their work. Set your own prices. We handle the rest.
             </p>
             <div className="flex flex-wrap justify-center gap-6">
               <Link to="/auth">
                 <Button size="lg" className="rounded-full px-16 py-8 text-lg font-black bg-white text-slate-900 hover:bg-stone-200 border-none shadow-2xl">
-                  Initiate Partnership
+                  Get Started Selling
                 </Button>
               </Link>
-              <Link to="/">
+              <Link to="/shop">
                 <Button variant="outline" size="lg" className="rounded-full px-16 py-8 text-lg font-black border-white/10 text-white hover:bg-white/5 backdrop-blur-sm">
-                  View Case Studies
+                  Browse Sellers
                 </Button>
               </Link>
             </div>

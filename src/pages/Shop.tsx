@@ -113,8 +113,8 @@ export default function Shop() {
               <ChevronRight className="h-3 w-3" />
               <span className="text-slate-900">Marketplace</span>
             </nav>
-            <h1 className="text-5xl font-black tracking-tighter text-slate-900 uppercase">The Collection</h1>
-            <p className="text-slate-500 mt-2">Discover unique items from South Africa's finest creators.</p>
+            <h1 className="text-5xl font-black tracking-tighter text-slate-900 uppercase">Shop</h1>
+            <p className="text-slate-500 mt-2">Browse items from independent creators.</p>
           </div>
           
           <div className="flex flex-wrap items-center gap-4">
@@ -122,7 +122,7 @@ export default function Shop() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-5 w-5 group-focus-within:text-slate-900 transition-colors" />
               <input
                 type="text"
-                placeholder="Search the marketplace..."
+                placeholder="Search items..."
                 className="pl-12 pr-4 py-3 w-full bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all shadow-sm"
                 value={searchTerm}
                 onChange={handleSearchChange}
@@ -135,7 +135,7 @@ export default function Shop() {
                 value={sortBy}
                 onChange={handleSortChange}
               >
-                <option value="newest">Latest Arrivals</option>
+                <option value="newest">Newest First</option>
                 <option value="price_asc">Price: Low to High</option>
                 <option value="price_desc">Price: High to Low</option>
               </select>
@@ -182,9 +182,9 @@ export default function Shop() {
             </div>
 
             <Card className="bg-slate-900 border-none p-8 text-white">
-              <h4 className="font-black text-xl mb-4 leading-tight uppercase">Support Local Heart</h4>
+              <h4 className="font-black text-xl mb-4 leading-tight uppercase">Support Creators</h4>
               <p className="text-slate-400 text-xs leading-relaxed mb-6 italic">
-                "By shopping here, you directly support South African artisans and small business owners."
+                "Each purchase helps independent creators in South Africa keep making great stuff."
               </p>
               <div className="h-1 w-12 bg-stone-400"></div>
             </Card>
@@ -255,10 +255,10 @@ export default function Shop() {
                     <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
                       <Search className="h-8 w-8 text-slate-300" />
                     </div>
-                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">No results matched</h3>
-                    <p className="text-slate-500 mt-2">Try adjusting your filters or search term.</p>
+                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Nothing found</h3>
+                    <p className="text-slate-500 mt-2">Try different filters or search terms.</p>
                     <Button variant="outline" className="mt-8 rounded-xl" onClick={() => handleCategoryChange('all')}>
-                      Clear All Filters
+                      Clear Filters
                     </Button>
                   </div>
                 )}
