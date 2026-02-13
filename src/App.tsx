@@ -12,6 +12,8 @@ import ProductForm from './pages/ProductForm'
 import Cart from './pages/Cart'
 
 import Checkout from './pages/Checkout'
+import CheckoutSuccess from './pages/CheckoutSuccess'
+import CheckoutCancelled from './pages/CheckoutCancelled'
 import Orders from './pages/Orders'
 import AdminDashboard from './pages/AdminDashboard'
 
@@ -38,6 +40,8 @@ function App() {
                   </ProtectedRoute>
                 } 
               />
+              <Route path="/checkout/success" element={<CheckoutSuccess />} />
+              <Route path="/checkout/cancelled" element={<CheckoutCancelled />} />
               
               <Route 
                 path="/seller/*" 

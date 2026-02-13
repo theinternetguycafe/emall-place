@@ -77,7 +77,8 @@ export default function Auth() {
           options: {
             data: {
               full_name: formData.fullName,
-              role: role
+              role: role,
+              store_name: role === 'seller' ? formData.storeName : null
             }
           }
         })
@@ -91,22 +92,6 @@ export default function Auth() {
             throw new Error('Rate limit exceeded. Please wait 1 minute.')
           }
           throw signUpError
-        }
-
-        if (role === 'seller' && data.user) {
-          if (data.session) {
-            console.log('Attempting store creation for seller...')
-            const { error: storeError } = await supabase
-              .from('seller_stores')
-              .insert({
-                owner_id: data.user.id,
-                store_name: formData.storeName,
-                status: 'pending'
-              })
-            if (storeError) {
-              console.warn('Initial store creation deferred:', storeError.message)
-            }
-          }
         }
 
         if (data.session) {
