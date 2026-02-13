@@ -20,27 +20,34 @@ export default function Home() {
 
   const fetchHomeData = async () => {
     try {
-      const [productsRes, categoriesRes] = await Promise.all([
-        supabase
-          .from('products')
-          .select('*, product_images(*), seller_store:seller_store_id(store_name)')
-          .eq('status', 'approved')
-          .limit(8)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('categories')
-          .select('*')
-          .limit(6)
-      ])
-
-      console.log('[Home] Products response:', productsRes)
-      console.log('[Home] Categories response:', categoriesRes)
-
-      if (productsRes?.data) setFeaturedProducts(productsRes.data)
-      if (categoriesRes?.data) setCategories(categoriesRes.data)
+      setLoading(true)
       
-      if (productsRes?.error) console.error('[Home] Products error:', productsRes.error)
-      if (categoriesRes?.error) console.error('[Home] Categories error:', categoriesRes.error)
+      // Fetch products first
+      const { data: products, error: pError } = await supabase
+        .from('products')
+        .select('*, product_images(*), seller_store:seller_store_id(store_name)')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(8)
+
+      if (pError) {
+        console.error('[Home] Products error:', pError)
+      } else if (products) {
+        setFeaturedProducts(products)
+      }
+
+      // Fetch categories
+      const { data: cats, error: cError } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name')
+        .limit(6)
+
+      if (cError) {
+        console.error('[Home] Categories error:', cError)
+      } else if (cats) {
+        setCategories(cats)
+      }
       
     } catch (error) {
       console.error('Error fetching home data:', error)

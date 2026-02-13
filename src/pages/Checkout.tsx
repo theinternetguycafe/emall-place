@@ -100,7 +100,7 @@ export default function Checkout() {
           totalAmount,
           calculatedItems,
           user.email,
-          profile?.full_name
+          profile?.full_name || undefined
         )
 
         if (paymentError) {

@@ -3,15 +3,17 @@
  * Run this to verify all payment methods are properly configured
  */
 
-import { supabase } from './lib/supabase'
+import { supabase } from '../lib/supabase'
+
+interface Check {
+  name: string
+  passed: boolean
+  error?: string
+}
 
 interface VerificationResult {
   category: string
-  checks: {
-    name: string
-    passed: boolean
-    error?: string
-  }[]
+  checks: Check[]
 }
 
 const results: VerificationResult[] = []
@@ -20,7 +22,7 @@ const results: VerificationResult[] = []
  * Check environment variables
  */
 async function checkEnvironmentVariables(): Promise<VerificationResult> {
-  const checks = [
+  const checks: Check[] = [
     {
       name: 'VITE_SUPABASE_URL configured',
       passed: !!import.meta.env.VITE_SUPABASE_URL,
@@ -57,7 +59,7 @@ async function checkEnvironmentVariables(): Promise<VerificationResult> {
  * Check database schema
  */
 async function checkDatabaseSchema(): Promise<VerificationResult> {
-  const checks = [
+  const checks: Check[] = [
     { name: 'Checking...', passed: true },
   ]
 
@@ -120,11 +122,11 @@ async function checkDatabaseSchema(): Promise<VerificationResult> {
  * Check payment libraries
  */
 async function checkPaymentLibraries(): Promise<VerificationResult> {
-  const checks: any[] = []
+  const checks: Check[] = []
 
   try {
     // Try to import payment libraries
-    const { createYocoPaymentLink } = await import('./lib/yoco')
+    const { createYocoPaymentLink } = await import('../lib/yoco')
     checks.push({
       name: 'Yoco library can be imported',
       passed: !!createYocoPaymentLink,
@@ -138,7 +140,7 @@ async function checkPaymentLibraries(): Promise<VerificationResult> {
   }
 
   try {
-    const { generateSnapScanQR } = await import('./lib/snapscan')
+    const { generateSnapScanQR } = await import('../lib/snapscan')
     checks.push({
       name: 'SnapScan library can be imported',
       passed: !!generateSnapScanQR,
@@ -152,7 +154,7 @@ async function checkPaymentLibraries(): Promise<VerificationResult> {
   }
 
   try {
-    const { createPayFastPayment } = await import('./lib/payfast')
+    const { createPayFastPayment } = await import('../lib/payfast')
     checks.push({
       name: 'PayFast library can be imported',
       passed: !!createPayFastPayment,
@@ -175,7 +177,7 @@ async function checkPaymentLibraries(): Promise<VerificationResult> {
  * Check API connectivity
  */
 async function checkAPIConnectivity(): Promise<VerificationResult> {
-  const checks = [
+  const checks: Check[] = [
     {
       name: 'Supabase connected',
       passed: false,
@@ -249,7 +251,7 @@ export async function runVerification(): Promise<void> {
 // Run verification if this file is executed directly
 if (typeof window !== 'undefined') {
   // Browser context
-  window.verifyPaymentIntegration = runVerification
+  (window as any).verifyPaymentIntegration = runVerification
   console.log('💡 Run verification in console: verifyPaymentIntegration()')
 } else {
   // Node context
