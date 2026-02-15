@@ -1,36 +1,6 @@
 import { supabase } from './supabase'
 
-// Yoco Configuration
-const YOCO_CONFIG = {
-  publicKey: import.meta.env.VITE_YOCO_PUBLIC_KEY || 'pk_test_placeholder',
-  secretKey: import.meta.env.VITE_YOCO_SECRET_KEY,
-  isSandbox: !import.meta.env.VITE_YOCO_SECRET_KEY || import.meta.env.VITE_YOCO_SECRET_KEY.includes('test'),
-  baseUrl: 'https://api.yoco.com/v1',
-  // If you have test keys, use them; otherwise production
-  apiUrl: (import.meta.env.VITE_YOCO_SECRET_KEY?.includes('test') || !import.meta.env.VITE_YOCO_SECRET_KEY)
-    ? 'https://api.sandbox.yoco.com/v1'
-    : 'https://api.yoco.com/v1'
-}
-
-export interface YocoPaymentLinkRequest {
-  amount: number // in cents (ZAR)
-  orderId: string
-  buyerEmail?: string
-  buyerName?: string
-  description: string
-}
-
-export interface YocoPaymentResponse {
-  success: boolean
-  paymentLink?: string
-  paymentId?: string
-  error?: string
-}
-
-/**
- * Create a Yoco Payment Link (server-side via Edge Function)
- * This delegates to the backend to keep secret keys safe
- */
+import { FunctionsHttpError } from '@supabase/supabase-js'
 export async function createYocoPaymentLink(
   orderId: string,
   totalAmount: number,
@@ -41,70 +11,84 @@ export async function createYocoPaymentLink(
   try {
     console.log('[Yoco] Creating payment link for order:', orderId)
 
-    // Update order status
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .update({
-        status: 'pending_payment',
-        payment_status: 'pending',
-        payment_method: 'yoco'
-      })
-      .eq('id', orderId)
-      .select()
-      .single()
+    // 0) Must have a session (JWT)
+    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession()
+    if (sessionErr) return { redirectUrl: '', error: sessionErr.message }
+    const accessToken = sessionData.session?.access_token
+    if (!accessToken) return { redirectUrl: '', error: 'No active session. Please sign in again.' }
 
-    if (orderError) {
-      console.error('[Yoco] Error updating order:', orderError)
-      return { redirectUrl: '', error: `Failed to update order: ${orderError.message}` }
+    // 1) Confirm order visible
+    const { data: existingOrder, error: existsErr } = await supabase
+      .from('orders')
+      .select('id, buyer_id, status, payment_status')
+      .eq('id', orderId)
+      .maybeSingle()
+
+    if (existsErr) return { redirectUrl: '', error: `Order lookup failed: ${existsErr.message}` }
+    if (!existingOrder) return { redirectUrl: '', error: 'Order not found or not accessible (RLS).' }
+
+    // 2) Update order flags (only columns that exist)
+    const { data: updatedRows, error: updateErr } = await supabase
+      .from('orders')
+      .update({ status: 'pending', payment_status: 'unpaid' })
+      .eq('id', orderId)
+      .select('id')
+
+    if (updateErr) return { redirectUrl: '', error: `Failed to update order: ${updateErr.message}` }
+    if (!updatedRows || updatedRows.length === 0) {
+      return { redirectUrl: '', error: 'Order update blocked (RLS).' }
     }
 
-    console.log('[Yoco] Order updated to pending_payment:', order)
+    // 3) Invoke Edge Function (FORCE auth header)
+    const itemNames = (items || [])
+      .map((i: any) => i?.product?.title)
+      .filter(Boolean)
+      .join(', ')
 
-    // Call the backend Edge Function to create payment link
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-    const funcUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/yoco-initiate`
+    const amountInCents = Math.round(Number(totalAmount || 0) * 100)
 
-    const itemNames = items.map((item: any) => item.product.title).join(', ')
-    const amountInCents = Math.round(totalAmount * 100) // Yoco uses cents
-
-    const resp = await fetch(funcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const { data: fnData, error: fnError } = await supabase.functions.invoke('yoco-initiate', {
+      body: {
         orderId,
         amount: amountInCents,
-        description: `Order #${orderId} - ${itemNames}`,
+        description: `Order #${orderId}${itemNames ? ` - ${itemNames}` : ''}`,
         buyerEmail: buyerEmail || undefined,
         buyerName: buyerName || undefined,
         metadata: {
           items: itemNames,
-          itemCount: items.length
+          itemCount: Array.isArray(items) ? items.length : 0
         }
-      })
+      },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY!
+      }
     })
 
-    const json = await resp.json()
-
-    if (!resp.ok) {
-      console.error('[Yoco] Initiate function error:', json)
-      return { redirectUrl: '', error: json.error || 'Failed to create Yoco payment' }
+    if (fnError) {
+      if (fnError instanceof FunctionsHttpError) {
+        const res = fnError.context
+        let details: any = null
+        try { details = await res.json() } catch {}
+        console.error('[Yoco] Function error details:', details)
+        return { redirectUrl: '', error: details?.error || fnError.message }
+      }
+      return { redirectUrl: '', error: fnError.message }
     }
 
-    if (!json.paymentLink) {
-      console.error('[Yoco] No payment link in response:', json)
-      return { redirectUrl: '', error: 'Invalid response from payment service' }
-    }
+    const paymentLink = (fnData as any)?.paymentLink
+    if (!paymentLink) return { redirectUrl: '', error: 'Invalid response from payment service (missing paymentLink).' }
 
-    console.log('[Yoco] Payment link created successfully')
-    return { redirectUrl: json.paymentLink, error: null }
-  } catch (error: any) {
-    console.error('[Yoco] Exception:', error)
-    return { redirectUrl: '', error: error.message || 'Unexpected error creating payment' }
+    console.log('[Yoco] Payment link created successfully:', paymentLink)
+    return { redirectUrl: paymentLink, error: null }
+  } catch (e: any) {
+    console.error('[Yoco] Exception:', e)
+    return { redirectUrl: '', error: e?.message || 'Unexpected error creating payment' }
   }
 }
 
 /**
- * Verify Yoco payment status
+ * Verify Yoco payment status (reads order row)
  */
 export async function verifyYocoPaymentStatus(orderId: string): Promise<{ paid: boolean; status: string }> {
   try {
@@ -112,16 +96,16 @@ export async function verifyYocoPaymentStatus(orderId: string): Promise<{ paid: 
       .from('orders')
       .select('payment_status, status')
       .eq('id', orderId)
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error('[Yoco] Error fetching order:', error)
       return { paid: false, status: 'error' }
     }
+    if (!order) return { paid: false, status: 'not_found' }
 
     const paid = order.payment_status === 'paid'
     console.log(`[Yoco] Payment status for ${orderId}: ${order.payment_status}`)
-
     return { paid, status: order.status }
   } catch (error: any) {
     console.error('[Yoco] Verify error:', error)

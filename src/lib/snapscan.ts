@@ -1,13 +1,5 @@
 import { supabase } from './supabase'
 
-// SnapScan Configuration
-const SNAPSCAN_CONFIG = {
-  merchantId: import.meta.env.VITE_SNAPSCAN_MERCHANT_ID || 'test_merchant',
-  apiKey: import.meta.env.VITE_SNAPSCAN_API_KEY,
-  isSandbox: !import.meta.env.VITE_SNAPSCAN_API_KEY || import.meta.env.VITE_SNAPSCAN_API_KEY.includes('test'),
-  baseUrl: 'https://api.snapscan.io/v1'
-}
-
 export interface SnapScanQRRequest {
   amount: number // in cents (ZAR)
   orderId: string
@@ -17,14 +9,16 @@ export interface SnapScanQRRequest {
 export interface SnapScanQRResponse {
   success: boolean
   qrCode?: string
-  qrCodeUrl?: string
   transactionId?: string
   error?: string
 }
 
 /**
- * Generate SnapScan QR Code (server-side via Edge Function)
- * Returns a QR code image that can be displayed to user
+ * Generate SnapScan QR Code (via Supabase Edge Function)
+ * - Ensures user is logged in (session exists)
+ * - Ensures order is visible (RLS check)
+ * - Updates order using VALID enum values from your schema
+ * - Invokes Edge Function using supabase.functions.invoke (auto JWT)
  */
 export async function generateSnapScanQR(
   orderId: string,
@@ -34,72 +28,102 @@ export async function generateSnapScanQR(
   try {
     console.log('[SnapScan] Generating QR code for order:', orderId)
 
-    // Update order status
-    const { data: order, error: orderError } = await supabase
+    // 0) Ensure session exists
+    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession()
+    if (sessionErr) {
+      console.error('[SnapScan] Session read error:', sessionErr)
+      return { qrCode: '', transactionId: '', error: `Auth session error: ${sessionErr.message}` }
+    }
+    if (!sessionData.session) {
+      return { qrCode: '', transactionId: '', error: 'No active session. Please sign in again.' }
+    }
+
+    // 1) Ensure order exists/visible (diagnose RLS vs wrong orderId)
+    const { data: existingOrder, error: existsErr } = await supabase
+      .from('orders')
+      .select('id, buyer_id, status, payment_status, total_amount')
+      .eq('id', orderId)
+      .maybeSingle()
+
+    if (existsErr) {
+      console.error('[SnapScan] Error checking order existence:', existsErr)
+      return { qrCode: '', transactionId: '', error: `Order lookup failed: ${existsErr.message}` }
+    }
+    if (!existingOrder) {
+      console.error('[SnapScan] Order not found/visible:', orderId)
+      return { qrCode: '', transactionId: '', error: 'Order not found or not accessible (RLS).' }
+    }
+
+    // 2) Update order with VALID enums only
+    // ✅ status allowed: pending | processing | completed | cancelled
+    // ✅ payment_status allowed: unpaid | paid | failed
+    //
+    // We keep it as pending + unpaid while QR is being paid.
+    const { data: updatedRows, error: updateErr } = await supabase
       .from('orders')
       .update({
-        status: 'pending_payment',
-        payment_status: 'pending',
-        payment_method: 'snapscan'
+        status: 'pending',
+        payment_status: 'unpaid',
       })
       .eq('id', orderId)
-      .select()
-      .single()
+      .select('id')
 
-    if (orderError) {
-      console.error('[SnapScan] Error updating order:', orderError)
-      return { qrCode: '', transactionId: '', error: `Failed to update order: ${orderError.message}` }
+    if (updateErr) {
+      console.error('[SnapScan] Error updating order:', updateErr)
+      return { qrCode: '', transactionId: '', error: `Failed to update order: ${updateErr.message}` }
+    }
+    if (!updatedRows || updatedRows.length === 0) {
+      console.error('[SnapScan] Update matched 0 rows (RLS blocked).', { orderId })
+      return {
+        qrCode: '',
+        transactionId: '',
+        error: 'Order update blocked (RLS). Ensure orders UPDATE policy allows buyer to update own order.',
+      }
     }
 
-    console.log('[SnapScan] Order updated to pending_payment:', order)
+    // 3) Invoke Edge Function (auth auto-included)
+    const itemNames = (items || [])
+      .map((item: any) => item?.product?.title)
+      .filter(Boolean)
+      .join(', ')
 
-    // Call the backend Edge Function to generate QR
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-    const funcUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/snapscan-initiate`
+    const amountInCents = Math.round(Number(totalAmount || 0) * 100)
 
-    const itemNames = items.map((item: any) => item.product.title).join(', ')
-    const amountInCents = Math.round(totalAmount * 100) // SnapScan uses cents
-
-    const resp = await fetch(funcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const { data: fnData, error: fnError } = await supabase.functions.invoke('snapscan-initiate', {
+      body: {
         orderId,
         amount: amountInCents,
-        description: `Order #${orderId} - ${itemNames}`,
+        description: `Order #${orderId}${itemNames ? ` - ${itemNames}` : ''}`,
         metadata: {
           items: itemNames,
-          itemCount: items.length
-        }
-      })
+          itemCount: Array.isArray(items) ? items.length : 0,
+        },
+      },
     })
 
-    const json = await resp.json()
-
-    if (!resp.ok) {
-      console.error('[SnapScan] Initiate function error:', json)
-      return { qrCode: '', transactionId: '', error: json.error || 'Failed to generate SnapScan QR' }
+    if (fnError) {
+      console.error('[SnapScan] Initiate function error:', fnError)
+      return { qrCode: '', transactionId: '', error: fnError.message || 'Failed to generate SnapScan QR' }
     }
 
-    if (!json.qrCode) {
-      console.error('[SnapScan] No QR code in response:', json)
-      return { qrCode: '', transactionId: '', error: 'Invalid response from QR service' }
+    const qrCode = (fnData as any)?.qrCode
+    const transactionId = (fnData as any)?.transactionId || orderId
+
+    if (!qrCode) {
+      console.error('[SnapScan] Missing qrCode in function response:', fnData)
+      return { qrCode: '', transactionId: '', error: 'Invalid response from SnapScan (missing qrCode).' }
     }
 
-    console.log('[SnapScan] QR code generated successfully')
-    return { 
-      qrCode: json.qrCode, 
-      transactionId: json.transactionId || orderId,
-      error: null 
-    }
+    console.log('[SnapScan] QR generated successfully:', transactionId)
+    return { qrCode, transactionId, error: null }
   } catch (error: any) {
     console.error('[SnapScan] Exception:', error)
-    return { qrCode: '', transactionId: '', error: error.message || 'Unexpected error generating QR' }
+    return { qrCode: '', transactionId: '', error: error?.message || 'Unexpected error generating QR' }
   }
 }
 
 /**
- * Verify SnapScan payment status via polling
+ * Verify SnapScan payment status via polling (reads order row)
  */
 export async function verifySnapScanPaymentStatus(orderId: string): Promise<{ paid: boolean; status: string }> {
   try {
@@ -107,32 +131,19 @@ export async function verifySnapScanPaymentStatus(orderId: string): Promise<{ pa
       .from('orders')
       .select('payment_status, status')
       .eq('id', orderId)
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error('[SnapScan] Error fetching order:', error)
       return { paid: false, status: 'error' }
     }
+    if (!order) return { paid: false, status: 'not_found' }
 
     const paid = order.payment_status === 'paid'
     console.log(`[SnapScan] Payment status for ${orderId}: ${order.payment_status}`)
-
     return { paid, status: order.status }
   } catch (error: any) {
     console.error('[SnapScan] Verify error:', error)
     return { paid: false, status: 'error' }
   }
-}
-
-/**
- * Generate a simple SVG-based QR code for local testing
- * In production, use a real QR library or API
- */
-export function generateLocalQRCode(data: string): string {
-  // This is a placeholder for local development
-  // In production, use qrcode library: npm install qrcode
-  // Then use: import QRCode from 'qrcode'; QRCode.toDataURL(data)
-  
-  // For now, return a data URL of a simple placeholder
-  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23fff' width='200' height='200'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='12' fill='%23000'%3E%3Ctspan x='50%25' dy='.3em'%3ESnapScan QR%3C/tspan%3E%3Ctspan x='50%25' dy='.3em'%3E${data.substring(0, 15)}...%3C/tspan%3E%3C/text%3E%3C/svg%3E`
 }

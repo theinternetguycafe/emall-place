@@ -66,9 +66,8 @@ export default function Checkout() {
           buyer_id: user.id,
           total_amount: totalAmount,
           total_commission: totalCommission,
-          status: 'pending_payment',
-          payment_status: 'pending',
-          payment_method: paymentMethod
+          status: 'pending',
+          payment_status: 'unpaid'
         })
         .select()
         .single()

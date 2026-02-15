@@ -44,89 +44,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(() => getCachedProfile())
   const [loading, setLoading] = useState(true)
   const fetchingProfileFor = useRef<string | null>(null)
-  const mounted = useRef(true)
+  const mounted = useRef(false)
+  const didInit = useRef(false)
 
   useEffect(() => {
-    mounted.current = true
-    
-    // Check for existing session immediately on mount
-    const initializeAuth = async () => {
+    mounted.current = true;
+    if (didInit.current) return;
+    didInit.current = true;
+
+    void (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        console.log('[AuthContext] Initial session check:', session?.user?.id)
-        
-        if (!mounted.current) return
-        
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (!mounted.current) return;
+        if (error) throw error;
+        console.log('[AuthContext] Initial session check:', session?.user?.id);
         if (session?.user) {
-          setUser(session.user)
-          // Check if cached profile matches this user
-          const cached = getCachedProfile()
+          setUser(session.user);
+          const cached = getCachedProfile();
           if (cached && cached.id === session.user.id) {
-            console.log('[AuthContext] Using cached profile for instant load')
-            setProfile(cached)
-            setLoading(false) // Set loading false immediately with cached data
+            console.log('[AuthContext] Using cached profile for instant load');
+            setProfile(cached);
           }
-          // Always fetch fresh profile in background (don't await)
-          fetchProfile(session.user.id, !!cached) // pass true if we have cache to not block UI
+          await fetchProfile(session.user.id, !!cached);
         } else {
-          setLoading(false)
+          setUser(null);
+          setProfile(null);
+          setCachedProfile(null);
         }
-      } catch (e) {
-        console.error('[AuthContext] Initial session check failed:', e)
-        if (mounted.current) setLoading(false)
+        setLoading(false);
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+        console.error('[AuthContext] Initial session check failed:', err);
+        if (mounted.current) setLoading(false);
       }
-    }
+    })().catch((err) => {
+      if (err?.name === 'AbortError') return;
+      console.error('[AuthContext] Unhandled initializeAuth:', err);
+    });
 
-    initializeAuth()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[AuthContext] Event: ${event}`, session?.user?.id)
-      
-      if (session?.user) {
-        setUser(session.user)
-        
-        // Skip if already fetching for this user
-        if (fetchingProfileFor.current === session.user.id) {
-          return
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      void (async () => {
+        if (!mounted.current) return;
+        console.log(`[AuthContext] Event: ${event}`, session?.user?.id);
+        if (session?.user) {
+          setUser(session.user);
+          const cached = getCachedProfile();
+          if (cached && cached.id === session.user.id) {
+            setProfile(cached);
+          }
+          await fetchProfile(session.user.id, !!cached);
+        } else {
+          setUser(null);
+          setProfile(null);
+          setCachedProfile(null);
         }
-        
-        // For SIGNED_IN events, use cached profile immediately if available
-        const cached = getCachedProfile()
-        if (cached && cached.id === session.user.id) {
-          setProfile(cached)
-          setLoading(false)
-        }
-        
-        // Fetch fresh profile (with small delay only for new signups)
-        if (event === 'SIGNED_IN' && !cached) {
-          // Only wait for DB trigger on fresh signup
-          await new Promise(resolve => setTimeout(resolve, 500))
-        }
-        
-        await fetchProfile(session.user.id, !!cached)
-      } else {
-        setUser(null)
-        setProfile(null)
-        setCachedProfile(null)
-        setLoading(false)
-        fetchingProfileFor.current = null
-      }
-
-      if (event === 'SIGNED_OUT') {
-        setUser(null)
-        setProfile(null)
-        setCachedProfile(null)
-        setLoading(false)
-        fetchingProfileFor.current = null
-      }
-    })
+        setLoading(false);
+      })().catch(err => {
+        if (err?.name === 'AbortError') return;
+        console.error('[AuthContext] Unhandled auth change:', err);
+      });
+    });
 
     return () => {
-      mounted.current = false
-      subscription.unsubscribe()
-    }
-  }, [])
+      mounted.current = false;
+      sub?.subscription?.unsubscribe();
+    };
+  }, []);
 
   const fetchProfile = async (userId: string, isBackgroundRefresh = false) => {
     if (fetchingProfileFor.current === userId) {
@@ -153,8 +136,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         console.error('[AuthContext] fetchProfile DB ERROR:', error)
         if (error.code === 'PGRST303' || error.message?.includes('JWT expired')) {
-          console.error('[AuthContext] JWT expired, signing out...')
-          await signOut()
+          console.error('[AuthContext] JWT expired, attempting session refresh...')
+          const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession()
+          if (!refreshErr && refreshed?.session?.access_token) {
+            console.log('[AuthContext] Session refreshed, retrying profile fetch...')
+            return await fetchProfile(userId, isBackgroundRefresh)
+          }
+          console.error('[AuthContext] Session refresh failed, signing out...')
+          await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
           return
         }
       }
@@ -223,7 +212,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     console.log('[AuthContext] Signing out...')
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
     setUser(null)
     setProfile(null)
     setCachedProfile(null)

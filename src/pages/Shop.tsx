@@ -45,7 +45,7 @@ export default function Shop() {
     try {
       let query = supabase
         .from('products')
-        .select('*, product_images(*), seller_store:seller_store_id(store_name)')
+        .select('*, product_images(*)')
         .eq('status', 'approved')
 
       if (selectedCategory !== 'all') {

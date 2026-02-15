@@ -1,13 +1,13 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 function getYocoApiUrl(): string {
-  // Check if we have test keys (sandbox) or production keys
   const secretKey = Deno.env.get('YOCO_SECRET_KEY') || ''
   if (!secretKey || secretKey.includes('test') || secretKey.includes('sk_test')) {
     return 'https://api.sandbox.yoco.com/v1'
@@ -16,14 +16,50 @@ function getYocoApiUrl(): string {
 }
 
 serve(async (req) => {
+  // ✅ CORS preflight first
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    // ✅ Require auth header
+    const authHeader = req.headers.get('authorization') || ''
+    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+
+    if (!jwt) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const anonKey = Deno.env.get('ANON_KEY') || '';
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // ✅ Validate user using ANON client + user JWT
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+      auth: { persistSession: false },
+    });
+
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token', details: userErr?.message }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = userData.user.id;
+
+    // ✅ Service client for DB access
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false },
+    });
+
     const { orderId, amount, description, buyerEmail, buyerName, metadata } = await req.json()
 
-    // Validate required fields
     if (!orderId || !amount || !description) {
       return new Response(
         JSON.stringify({ error: 'Missing required parameters: orderId, amount, description' }),
@@ -33,131 +69,99 @@ serve(async (req) => {
 
     const yocoSecretKey = Deno.env.get('YOCO_SECRET_KEY')
     if (!yocoSecretKey) {
-      console.error('[Yoco] YOCO_SECRET_KEY not configured')
       return new Response(
-        JSON.stringify({ error: 'Payment service not configured' }),
+        JSON.stringify({ error: 'Payment service not configured (YOCO_SECRET_KEY missing)' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     const siteUrl = Deno.env.get('SITE_URL') || 'https://example.com'
 
-    // Initialize Supabase client
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
-    // Get full order details for additional validation
-    const { data: order, error: orderError } = await supabase
+    // ✅ Load order & ensure it belongs to caller
+    const { data: order, error: orderErr } = await admin
       .from('orders')
       .select('id, buyer_id, total_amount, status')
       .eq('id', orderId)
       .single()
 
-    if (orderError || !order) {
-      console.error('[Yoco] Order not found:', orderError)
+    if (orderErr || !order) {
       return new Response(
         JSON.stringify({ error: 'Order not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Verify amount matches order
-    const expectedAmount = Math.round(order.total_amount * 100)
-    if (amount !== expectedAmount) {
-      console.error('[Yoco] Amount mismatch:', { provided: amount, expected: expectedAmount })
+    if (order.buyer_id !== userId) {
       return new Response(
-        JSON.stringify({ error: 'Amount mismatch' }),
+        JSON.stringify({ error: 'Forbidden: order does not belong to this user' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // ✅ Verify amount matches order
+    const expectedAmount = Math.round(Number(order.total_amount) * 100)
+    if (Number(amount) !== expectedAmount) {
+      return new Response(
+        JSON.stringify({ error: 'Amount mismatch', expectedAmount, providedAmount: amount }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Get site URL for redirects
-    const successUrl = `${siteUrl}/#/checkout-success?order_id=${orderId}`
-    const failureUrl = `${siteUrl}/#/checkout-cancelled?order_id=${orderId}`
+    const successUrl = `${siteUrl}/#/checkout?order_id=${orderId}&status=success`
+    const failureUrl = `${siteUrl}/#/checkout?order_id=${orderId}&status=cancelled`
 
-    // Prepare Yoco payment link request
     const yocoApiUrl = getYocoApiUrl()
-    const paymentLinkRequestBody = {
-      amount: amount, // in cents
+
+    const paymentLinkBody = {
+      amount,
       customer: {
-        email: buyerEmail || 'customer@example.com',
+        email: buyerEmail || userData.user.email || 'customer@example.com',
         name: buyerName || 'Customer',
       },
-      description: description,
-      redirectUrl: {
-        success: successUrl,
-        failure: failureUrl,
-      },
-      metadata: {
-        orderId: orderId,
-        ...metadata,
-      },
+      description,
+      redirectUrl: { success: successUrl, failure: failureUrl },
+      metadata: { orderId, ...metadata },
     }
 
-    console.log('[Yoco] Creating payment link with:', {
-      amount: amount,
-      orderId: orderId,
-      apiUrl: yocoApiUrl,
-    })
-
-    // Call Yoco API to create payment link
-    const yocoResponse = await fetch(`${yocoApiUrl}/links`, {
+    const yocoResp = await fetch(`${yocoApiUrl}/links`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${yocoSecretKey}`,
+        Authorization: `Bearer ${yocoSecretKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(paymentLinkRequestBody),
+      body: JSON.stringify(paymentLinkBody),
     })
 
-    const yocoData = await yocoResponse.json()
+    const yocoJson = await yocoResp.json()
 
-    if (!yocoResponse.ok) {
-      console.error('[Yoco] API error:', yocoData)
+    if (!yocoResp.ok) {
       return new Response(
-        JSON.stringify({ 
-          error: yocoData.message || 'Failed to create payment link',
-          details: yocoData 
-        }),
-        { status: yocoResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: yocoJson?.message || 'Yoco API error', details: yocoJson }),
+        { status: yocoResp.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Store payment record in database
-    const { error: paymentError } = await supabase
-      .from('payments')
-      .insert({
-        order_id: orderId,
-        payment_method: 'yoco',
-        provider_reference: yocoData.id || yocoData.reference,
-        status: 'pending',
-        amount: order.total_amount,
-        metadata: {
-          paymentLinkId: yocoData.id,
-          yocoResponse: yocoData,
-        },
-      })
-
-    if (paymentError) {
-      console.error('[Yoco] Failed to store payment record:', paymentError)
-    }
-
-    console.log('[Yoco] Payment link created successfully:', yocoData.redirectUrl)
+    // ✅ Upsert payment record
+    await admin.from('payments').insert({
+      order_id: orderId,
+      payment_method: 'yoco',
+      provider_reference: yocoJson.id || yocoJson.reference || null,
+      status: 'pending',
+      amount: order.total_amount,
+      metadata: { yocoResponse: yocoJson },
+    })
 
     return new Response(
       JSON.stringify({
         success: true,
-        paymentLink: yocoData.redirectUrl,
-        paymentId: yocoData.id,
-        message: 'Payment link created successfully',
+        paymentLink: yocoJson.redirectUrl,
+        paymentId: yocoJson.id,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (error: any) {
-    console.error('[Yoco] Exception:', error)
+  } catch (e) {
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', details: String(e?.message || e) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

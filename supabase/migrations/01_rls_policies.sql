@@ -101,6 +101,11 @@ create policy "Buyers can view own order items" on public.order_items
     exists (select 1 from public.orders where id = order_items.order_id and buyer_id = auth.uid())
   );
 
+create policy "Buyers can create order items" on public.order_items
+  for insert with check (
+    exists (select 1 from public.orders where id = order_items.order_id and buyer_id = auth.uid())
+  );
+
 create policy "Sellers can view and update own order items" on public.order_items
   for select using (
     exists (
