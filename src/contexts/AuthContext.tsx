@@ -72,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCachedProfile(null);
         }
         setLoading(false);
-      } catch (err) {
+      } catch (err: any) {
         if (err?.name === 'AbortError') return;
         console.error('[AuthContext] Initial session check failed:', err);
         if (mounted.current) setLoading(false);

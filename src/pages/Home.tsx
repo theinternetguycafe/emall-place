@@ -63,7 +63,12 @@ export default function Home() {
 
         if (pError) throw pError
 
-        const safeProducts: Product[] = Array.isArray(products) ? (products as Product[]) : []
+        const safeProducts: Product[] = Array.isArray(products)
+          ? products.map((p: any) => ({
+              ...p,
+              seller_store: Array.isArray(p.seller_store) ? p.seller_store[0] : p.seller_store,
+            }))
+          : [];
         setFeaturedProducts(safeProducts)
 
         // -------- CATEGORIES --------
