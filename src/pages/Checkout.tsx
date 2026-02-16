@@ -26,27 +26,43 @@ export default function Checkout() {
   const [snapScanQR, setSnapScanQR] = useState<string | null>(null)
   const [showSnapScanQR, setShowSnapScanQR] = useState(false)
 
-  const handleCheckout = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-
-    // Double-check auth state (should not happen due to redirect above, but safety check)
-    if (authLoading) {
-      addToast('Please wait, verifying your session...', 'info')
-      return
-    }
-
-    if (!user) {
-      navigate('/auth')
-      return
-    }
-
-    addToast('Processing payment...', 'info')
-
-    setLoading(true)
+  const handleCheckoutFailure = async (orderId: string, reason: string) => {
     try {
-      const commissionRate = 0.08
+      await supabase
+        .from('orders')
+        .update({
+          status: 'failed',
+          payment_status: 'failed'
+        })
+        .eq('id', orderId)
+      
+      console.log(`[Checkout] Order ${orderId} marked as failed. Reason: ${reason}`)
+    } catch (err) {
+      console.error('[Checkout] Failed to update order failure status:', err)
+    }
+  }
 
+  const handleCheckout = async (e: React.FormEvent) => {
+    if (e) e.preventDefault()
+    
+    // 1) Block duplicate checkout + ensure valid state
+    if (loading || polling || authLoading) return
+    
+    setError(null)
+    let currentOrderId: string | null = null
+
+    try {
+      // 2) Fetch fresh session & verify token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError || !session?.access_token) {
+        throw new Error('Your session has expired. Please sign in again.')
+      }
+
+      setLoading(true)
+      addToast('Processing payment...', 'info')
+
+      const commissionRate = 0.08
       const calculatedItems = items.map(item => {
         const itemTotal = Number((item.product.price * item.quantity).toFixed(2))
         const commissionAmount = Number((itemTotal * commissionRate).toFixed(2))
@@ -59,11 +75,11 @@ export default function Checkout() {
 
       const totalCommission = calculatedItems.reduce((sum, item) => sum + item.commissionAmount, 0)
 
-      // Step 1: Create order with pending_payment status
+      // 3) Create order
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
-          buyer_id: user.id,
+          buyer_id: session.user.id,
           total_amount: totalAmount,
           total_commission: totalCommission,
           status: 'pending',
@@ -74,6 +90,7 @@ export default function Checkout() {
 
       if (orderError) throw new Error(`Order creation failed: ${orderError.message}`)
 
+      currentOrderId = order.id
       setOrderId(order.id)
       console.log('[Checkout] Order created:', order.id)
 
@@ -91,46 +108,43 @@ export default function Checkout() {
       const { error: itemsError } = await supabase.from('order_items').insert(orderItemsData)
       if (itemsError) throw new Error(`Failed to save order items: ${itemsError.message}`)
 
-      // Step 2: Process payment based on selected method
+      // 4) Process payment
       if (paymentMethod === 'yoco') {
-        // Yoco Integration - Redirect to payment link
         const { redirectUrl, error: paymentError } = await createYocoPaymentLink(
           order.id,
           totalAmount,
           calculatedItems,
-          user.email,
+          session.access_token,
+          session.user.email,
           profile?.full_name || undefined
         )
 
-        if (paymentError) {
-          throw new Error(paymentError)
-        }
-
-        console.log('[Checkout] Redirecting to Yoco:', redirectUrl)
+        if (paymentError) throw new Error(paymentError)
         window.location.href = redirectUrl
       } else if (paymentMethod === 'snapscan') {
-        // SnapScan Integration - Generate QR code for polling
         const { qrCode, transactionId, error: qrError } = await generateSnapScanQR(
           order.id,
           totalAmount,
           calculatedItems
         )
 
-        if (qrError) {
-          throw new Error(qrError)
-        }
+        if (qrError) throw new Error(qrError)
 
         console.log('[Checkout] SnapScan QR generated:', transactionId)
         setSnapScanQR(qrCode)
         setShowSnapScanQR(true)
-        // Start polling for payment status
-        setTimeout(() => {
-          pollPaymentStatus(order.id, 'snapscan')
-        }, 1000)
+        setTimeout(() => pollPaymentStatus(order.id, 'snapscan'), 1000)
       }
     } catch (err: any) {
       console.error('Checkout error:', err)
-      setError('Something went wrong. Please try again.')
+      const errorMessage = err.message || 'Something went wrong. Please try again.'
+      
+      if (currentOrderId) {
+        await handleCheckoutFailure(currentOrderId, errorMessage)
+      }
+
+      setError(errorMessage)
+      addToast(errorMessage, 'error')
     } finally {
       setLoading(false)
     }

@@ -5,41 +5,17 @@ export async function createYocoPaymentLink(
   orderId: string,
   totalAmount: number,
   items: any[],
+  accessToken: string,
   buyerEmail?: string,
   buyerName?: string
 ): Promise<{ redirectUrl: string; error: string | null }> {
   try {
     console.log('[Yoco] Creating payment link for order:', orderId)
 
-    // 0) Must have a session (JWT)
-    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession()
-    if (sessionErr) return { redirectUrl: '', error: sessionErr.message }
-    const accessToken = sessionData.session?.access_token
+    // Validate accessToken exists
     if (!accessToken) return { redirectUrl: '', error: 'No active session. Please sign in again.' }
 
-    // 1) Confirm order visible
-    const { data: existingOrder, error: existsErr } = await supabase
-      .from('orders')
-      .select('id, buyer_id, status, payment_status')
-      .eq('id', orderId)
-      .maybeSingle()
-
-    if (existsErr) return { redirectUrl: '', error: `Order lookup failed: ${existsErr.message}` }
-    if (!existingOrder) return { redirectUrl: '', error: 'Order not found or not accessible (RLS).' }
-
-    // 2) Update order flags (only columns that exist)
-    const { data: updatedRows, error: updateErr } = await supabase
-      .from('orders')
-      .update({ status: 'pending', payment_status: 'unpaid' })
-      .eq('id', orderId)
-      .select('id')
-
-    if (updateErr) return { redirectUrl: '', error: `Failed to update order: ${updateErr.message}` }
-    if (!updatedRows || updatedRows.length === 0) {
-      return { redirectUrl: '', error: 'Order update blocked (RLS).' }
-    }
-
-    // 3) Invoke Edge Function (FORCE auth header)
+    // Build item names for description
     const itemNames = (items || [])
       .map((i: any) => i?.product?.title)
       .filter(Boolean)
@@ -47,6 +23,7 @@ export async function createYocoPaymentLink(
 
     const amountInCents = Math.round(Number(totalAmount || 0) * 100)
 
+    // Invoke Edge Function with Authorization header only
     const { data: fnData, error: fnError } = await supabase.functions.invoke('yoco-initiate', {
       body: {
         orderId,
@@ -60,8 +37,7 @@ export async function createYocoPaymentLink(
         }
       },
       headers: {
-        Authorization: `Bearer ${accessToken}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY!
+        Authorization: `Bearer ${accessToken}`
       }
     })
 
@@ -76,11 +52,14 @@ export async function createYocoPaymentLink(
       return { redirectUrl: '', error: fnError.message }
     }
 
-    const paymentLink = (fnData as any)?.paymentLink
-    if (!paymentLink) return { redirectUrl: '', error: 'Invalid response from payment service (missing paymentLink).' }
+    // Support both redirectUrl and paymentLink, prefer redirectUrl
+    const redirectUrl = (fnData as any)?.redirectUrl || (fnData as any)?.paymentLink
+    if (!redirectUrl) {
+      return { redirectUrl: '', error: 'Invalid response from payment service (missing redirectUrl or paymentLink).' }
+    }
 
-    console.log('[Yoco] Payment link created successfully:', paymentLink)
-    return { redirectUrl: paymentLink, error: null }
+    console.log('[Yoco] Payment link created successfully:', redirectUrl)
+    return { redirectUrl, error: null }
   } catch (e: any) {
     console.error('[Yoco] Exception:', e)
     return { redirectUrl: '', error: e?.message || 'Unexpected error creating payment' }
