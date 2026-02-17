@@ -9,6 +9,9 @@ import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Input } from '../components/ui/Input'
+import { getSellerOnboarding, initializeSellerOnboarding } from '../lib/onboarding'
+import SellerQuickStart from '../components/seller/SellerQuickStart'
+import SellerTour from '../components/seller/SellerTour'
 
 export default function SellerDashboard() {
   const { profile } = useAuth()
@@ -21,6 +24,8 @@ export default function SellerDashboard() {
   const [storeName, setStoreName] = useState('')
   const [creatingStore, setCreatingStore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [onboarding, setOnboarding] = useState<any>(null)
+  const [isTourOpen, setIsTourOpen] = useState(false)
 
   useEffect(() => {
     if (profile?.id) {
@@ -52,6 +57,17 @@ export default function SellerDashboard() {
         setOrderItems(oRes.data ?? [])
       }
     }
+
+    // Fetch onboarding progress
+    const onboardingData = await getSellerOnboarding(profile!.id)
+    if (!onboardingData) {
+      await initializeSellerOnboarding(profile!.id)
+      const freshData = await getSellerOnboarding(profile!.id)
+      setOnboarding(freshData)
+    } else {
+      setOnboarding(onboardingData)
+    }
+
     setLoading(false)
   }
 
@@ -167,7 +183,7 @@ export default function SellerDashboard() {
               </div>
             )}
 
-            <form onSubmit={createStore} className="space-y-6">
+            <form onSubmit={createStore} className="space-y-6" id="store-form-section">
               <Input
                 label="Store Name"
                 placeholder="My Artisan Shop"
@@ -230,13 +246,29 @@ export default function SellerDashboard() {
           </div>
           <div className="flex gap-4">
             <Link to="/seller/products/new">
-              <Button className="rounded-full px-8 py-6 gap-2 shadow-xl shadow-slate-200">
+              <Button id="create-product-button" className="rounded-full px-8 py-6 gap-2 shadow-xl shadow-slate-200">
                 <Plus className="h-5 w-5" />
                 Add New Craft
               </Button>
             </Link>
           </div>
         </div>
+
+        {/* Seller Onboarding Quick Start */}
+        {onboarding && (
+          <>
+            <SellerQuickStart onboarding={onboarding} onStartTour={() => setIsTourOpen(true)} />
+            <SellerTour
+              isOpen={isTourOpen}
+              onClose={() => setIsTourOpen(false)}
+              onComplete={() => {
+                setIsTourOpen(false)
+                fetchData()
+              }}
+              currentStep={onboarding.step_index || 0}
+            />
+          </>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
@@ -301,6 +333,7 @@ export default function SellerDashboard() {
                 {activeTab === 'products' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-full" />}
               </button>
               <button
+                id="orders-tab"
                 onClick={() => setActiveTab('orders')}
                 className={`text-[10px] font-black uppercase tracking-[0.3em] transition-all relative pb-2 ${
                   activeTab === 'orders' ? 'text-slate-900' : 'text-stone-300 hover:text-stone-500'

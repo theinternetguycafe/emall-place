@@ -80,12 +80,18 @@ export default function Home() {
 
         if (cError) throw cError
         setCategories(cats || [])
-      } catch (err: unknown) {
-        console.error('[Home] fetchHomeData error:', err)
-        const msg = err instanceof Error ? err.message : 'Failed to load home data.'
-        setErrorMsg(msg)
-        setFeaturedProducts([])
-        setCategories([])
+      } catch (err: any) {
+        // Ignore aborts (React 18 StrictMode / navigation / unmount)
+        if (err?.name === "AbortError" || String(err?.message || "").toLowerCase().includes("aborted")) {
+          return;
+        }
+
+        console.error("[Home] fetchHomeData error:", err);
+
+        const msg = err?.message || "Failed to load home data.";
+        setErrorMsg(msg);
+        setFeaturedProducts([]);
+        setCategories([]);
       } finally {
         setLoading(false)
       }

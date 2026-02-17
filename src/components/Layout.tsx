@@ -10,7 +10,7 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, loading, signOut } = useAuth()
   const { itemCount } = useCart()
   const location = useLocation()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
@@ -67,42 +67,44 @@ export default function Layout({ children }: LayoutProps) {
               </Link>
 
               <div className="hidden md:flex items-center space-x-2 border-l border-stone-100 ml-4 pl-6">
-                {user ? (
-                  <div className="flex items-center space-x-3">
-                    {profile?.role === 'seller' && (
-                      <Link to="/seller">
-                        <Button variant="outline" size="sm" className="rounded-full border-stone-200 gap-2">
-                          <Store className="h-4 w-4" />
-                          Seller Hub
-                        </Button>
+                {!loading ? (
+                  user ? (
+                    <div className="flex items-center space-x-3">
+                      {profile?.role === 'seller' && (
+                        <Link to="/seller">
+                          <Button variant="outline" size="sm" className="rounded-full border-stone-200 gap-2">
+                            <Store className="h-4 w-4" />
+                            Seller Hub
+                          </Button>
+                        </Link>
+                      )}
+                      {profile?.role === 'admin' && (
+                        <Link to="/admin">
+                          <Button variant="primary" size="sm" className="rounded-full bg-slate-900">Admin</Button>
+                        </Link>
+                      )}
+                      <Link to="/account" className="p-3 text-slate-400 hover:text-slate-900 transition-all">
+                        <UserIcon className="h-6 w-6" />
                       </Link>
-                    )}
-                    {profile?.role === 'admin' && (
-                      <Link to="/admin">
-                        <Button variant="primary" size="sm" className="rounded-full bg-slate-900">Admin</Button>
+                      <button 
+                        onClick={() => signOut()}
+                        className="p-3 text-stone-300 hover:text-rose-600 transition-all"
+                        title="Sign Out"
+                      >
+                        <LogOut className="h-6 w-6" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <Link to="/auth">
+                        <Button variant="ghost" size="sm" className="text-stone-500 font-bold uppercase tracking-widest text-[10px]">Sign In</Button>
                       </Link>
-                    )}
-                    <Link to="/account" className="p-3 text-slate-400 hover:text-slate-900 transition-all">
-                      <UserIcon className="h-6 w-6" />
-                    </Link>
-                    <button 
-                      onClick={() => signOut()}
-                      className="p-3 text-stone-300 hover:text-rose-600 transition-all"
-                      title="Sign Out"
-                    >
-                      <LogOut className="h-6 w-6" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <Link to="/auth">
-                      <Button variant="ghost" size="sm" className="text-stone-500 font-bold uppercase tracking-widest text-[10px]">Sign In</Button>
-                    </Link>
-                    <Link to="/auth?signup=true">
-                      <Button size="sm" className="rounded-full px-6 font-black uppercase tracking-widest text-[10px]">Register</Button>
-                    </Link>
-                  </div>
-                )}
+                      <Link to="/auth?signup=true">
+                        <Button size="sm" className="rounded-full px-6 font-black uppercase tracking-widest text-[10px]">Register</Button>
+                      </Link>
+                    </div>
+                  )
+                ) : null}
               </div>
 
               {/* Mobile Menu Toggle */}
@@ -129,19 +131,21 @@ export default function Layout({ children }: LayoutProps) {
               Marketplace
             </Link>
             <hr className="border-stone-100" />
-            {user ? (
-              <div className="space-y-4">
-                <Link to="/account" className="block text-lg font-bold text-stone-500" onClick={() => setIsMobileMenuOpen(false)}>Account</Link>
-                {profile?.role === 'seller' && (
-                  <Link to="/seller" className="block text-lg font-bold text-stone-500" onClick={() => setIsMobileMenuOpen(false)}>Seller Hub</Link>
-                )}
-                <button onClick={() => { signOut(); setIsMobileMenuOpen(false); }} className="block w-full text-left text-lg font-bold text-rose-600 pt-4">Sign Out</button>
-              </div>
-            ) : (
-              <div className="space-y-4 pt-4">
-                <Link to="/auth" className="block text-center py-4 bg-slate-900 text-white font-black rounded-2xl" onClick={() => setIsMobileMenuOpen(false)}>Get Started</Link>
-              </div>
-            )}
+            {!loading ? (
+              user ? (
+                <div className="space-y-4">
+                  <Link to="/account" className="block text-lg font-bold text-stone-500" onClick={() => setIsMobileMenuOpen(false)}>Account</Link>
+                  {profile?.role === 'seller' && (
+                    <Link to="/seller" className="block text-lg font-bold text-stone-500" onClick={() => setIsMobileMenuOpen(false)}>Seller Hub</Link>
+                  )}
+                  <button onClick={() => { signOut(); setIsMobileMenuOpen(false); }} className="block w-full text-left text-lg font-bold text-rose-600 pt-4">Sign Out</button>
+                </div>
+              ) : (
+                <div className="space-y-4 pt-4">
+                  <Link to="/auth" className="block text-center py-4 bg-slate-900 text-white font-black rounded-2xl" onClick={() => setIsMobileMenuOpen(false)}>Get Started</Link>
+                </div>
+              )
+            ) : null}
           </div>
         </div>
       )}

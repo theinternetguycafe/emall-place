@@ -97,6 +97,16 @@ export default function Auth() {
         }
 
         if (data.session) {
+          console.log('Registration successful, waiting for AuthContext...')
+          // For signup, we need to wait for AuthContext to complete loading
+          // This ensures the profile (especially role) is loaded before redirect
+          let waitCount = 0
+          const maxWaits = 30 // 15 seconds max
+          while (authLoading && waitCount < maxWaits) {
+            console.log(`Waiting for AuthContext... (${waitCount}/${maxWaits})`)
+            await new Promise(resolve => setTimeout(resolve, 500))
+            waitCount++
+          }
           console.log('Registration successful, redirecting...')
           addToast('Account created! Welcome! 🎉', 'success')
           navigate('/')

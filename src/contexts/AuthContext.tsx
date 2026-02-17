@@ -86,6 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       void (async () => {
         if (!mounted.current) return;
         console.log(`[AuthContext] Event: ${event}`, session?.user?.id);
+        console.log('[AuthContext] User metadata:', session?.user?.user_metadata);
         if (session?.user) {
           setUser(session.user);
           const cached = getCachedProfile();
@@ -140,6 +141,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession()
           if (!refreshErr && refreshed?.session?.access_token) {
             console.log('[AuthContext] Session refreshed, retrying profile fetch...')
+            // Clear fetching flag before retry so the new attempt can proceed
+            fetchingProfileFor.current = null
             return await fetchProfile(userId, isBackgroundRefresh)
           }
           console.error('[AuthContext] Session refresh failed, signing out...')
@@ -151,7 +154,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!data) {
         // Profile doesn't exist, create it (safety net)
         console.log('[AuthContext] Profile missing in DB, attempting safety net creation...')
+        
+        // Wait a moment for the database trigger to complete
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Try fetching again in case trigger just completed
+        const { data: retryData, error: retryError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle()
+        
+        if (!retryError && retryData) {
+          console.log('[AuthContext] Profile found on retry:', retryData)
+          setProfile(retryData)
+          setCachedProfile(retryData)
+          return
+        }
+        
         const { data: { user: userData } } = await supabase.auth.getUser()
+        console.log('[AuthContext] User metadata for safety net:', userData?.user_metadata)
         if (userData) {
           const { data: newProfile, error: createError } = await supabase
             .from('profiles')
@@ -164,10 +186,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .maybeSingle()
           
           if (!createError && newProfile) {
-            console.log('[AuthContext] Profile created/synced via safety net')
+            console.log('[AuthContext] Profile created/synced via safety net:', newProfile)
             setProfile(newProfile)
             setCachedProfile(newProfile)
           } else {
+            console.error('[AuthContext] Safety net upsert failed:', createError)
             // Create a minimal profile in memory
             const fallbackProfile: Profile = {
               id: userData.id,
@@ -176,6 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               phone: null,
               created_at: new Date().toISOString()
             }
+            console.log('[AuthContext] Using fallback profile:', fallbackProfile)
             setProfile(fallbackProfile)
           }
         }

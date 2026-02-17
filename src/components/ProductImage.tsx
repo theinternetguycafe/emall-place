@@ -31,10 +31,14 @@ export default function ProductImage({ src, alt, className = "" }: ProductImageP
         src={src}
         alt={alt}
         className={`w-full h-full object-cover transition-opacity duration-300 ${loading ? 'opacity-0' : 'opacity-100'}`}
-        onLoad={() => setLoading(false)}
+        onLoad={() => {
+          setLoading(false)
+          console.log('[ProductImage] Image loaded:', src)
+        }}
         onError={() => {
           setError(true)
           setLoading(false)
+          console.error('[ProductImage] Image failed to load:', { src, alt })
         }}
       />
     </div>

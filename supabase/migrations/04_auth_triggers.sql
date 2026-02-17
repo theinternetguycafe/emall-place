@@ -10,6 +10,7 @@ declare
 begin
   user_role := coalesce(new.raw_user_meta_data->>'role', 'buyer');
   
+  -- Insert into profiles table
   insert into public.profiles (id, full_name, role)
   values (
     new.id,
@@ -17,13 +18,19 @@ begin
     user_role
   );
 
+  -- If user is a seller, create their store entry
   if user_role = 'seller' then
-    insert into public.seller_stores (owner_id, store_name, status)
-    values (
-      new.id,
-      coalesce(new.raw_user_meta_data->>'store_name', 'My Store'),
-      'pending'
-    );
+    begin
+      insert into public.seller_stores (owner_id, store_name, status)
+      values (
+        new.id,
+        coalesce(new.raw_user_meta_data->>'store_name', 'My Store'),
+        'pending'
+      );
+    exception when others then
+      -- Log error but don't fail the trigger - profile was created successfully
+      raise log 'Warning: Failed to create seller_stores for user %. Error: %', new.id, sqlerrm;
+    end;
   end if;
 
   return new;
