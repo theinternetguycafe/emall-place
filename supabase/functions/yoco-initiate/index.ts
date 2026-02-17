@@ -9,12 +9,17 @@ const corsHeaders = {
 };
 
 
-function getYocoApiUrl(): string {
-  const secretKey = Deno.env.get("YOCO_SECRET_KEY") || "";
-  if (!secretKey || secretKey.includes("test") || secretKey.includes("sk_test")) {
-    return "https://api.sandbox.yoco.com/v1";
+function validateYocoSecretKey(secretKey: string): void {
+  // Validate that we have a secret key (must start with sk_)
+  if (!secretKey) {
+    console.error("[yoco-initiate] ERROR: YOCO_SECRET_KEY not configured");
+    throw new Error("YOCO_SECRET_KEY not configured");
   }
-  return "https://api.yoco.com/v1";
+  
+  if (!secretKey.startsWith("sk_")) {
+    console.error("[yoco-initiate] ERROR: YOCO_SECRET_KEY does not start with 'sk_' - appears to be public key");
+    throw new Error("YOCO_SECRET_KEY invalid format - must be secret key");
+  }
 }
 
 
@@ -26,6 +31,10 @@ Deno.serve(async (req) => {
 
   try {
     console.log("[yoco-initiate] Function invoked - method:", req.method);
+    
+    // DEBUG: Log environment at start
+    const yocoMode = Deno.env.get("YOCO_MODE") || "sandbox";
+    console.log("[yoco-initiate] DEBUG YOCO_MODE:", yocoMode);
     
     // Read Authorization header
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -65,13 +74,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    const yocoSecretKey = Deno.env.get("YOCO_SECRET_KEY");
-    if (!yocoSecretKey) {
-      return new Response(
-        JSON.stringify({ error: "Payment service not configured (YOCO_SECRET_KEY missing)" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const yocoSecretKey = (Deno.env.get("YOCO_SECRET_KEY") || "").trim();
+    console.log("[yoco-initiate] DEBUG YOCO_SECRET_KEY - prefix:", yocoSecretKey.slice(0, 8), "length:", yocoSecretKey.length);
+    
+    // Validate Yoco secret key
+    validateYocoSecretKey(yocoSecretKey);
 
     const siteUrl = Deno.env.get("SITE_URL") || "https://example.com";
 
@@ -108,69 +115,96 @@ Deno.serve(async (req) => {
     }
 
     const successUrl = `${siteUrl}/#/checkout?order_id=${orderId}&status=success`;
+    const cancelUrl = `${siteUrl}/#/checkout?order_id=${orderId}&status=cancelled`;
     const failureUrl = `${siteUrl}/#/checkout?order_id=${orderId}&status=failed`;
-    const yocoApiUrl = getYocoApiUrl();
 
-    const paymentLinkBody = {
-      amount,
-      customer: {
-        email: buyerEmail || user.email || "customer@example.com",
-        name: buyerName || "Customer",
+    // Build Yoco Checkouts API payload
+    const checkoutPayload = {
+      amount: expectedAmount, // Amount in cents
+      currency: "ZAR",
+      externalId: orderId,
+      successUrl,
+      cancelUrl,
+      failureUrl,
+      metadata: {
+        orderId,
+        buyerEmail: buyerEmail || user.email || "customer@example.com",
+        buyerName: buyerName || "Customer",
+        ...metadata,
       },
-      description,
-      redirectUrl: { success: successUrl, failure: failureUrl },
-      metadata: { orderId, ...metadata },
     };
 
-    const yocoResp = await fetch(`${yocoApiUrl}/links`, {
+    console.log("[yoco-initiate] Creating Yoco checkout with payload:", JSON.stringify(checkoutPayload, null, 2));
+
+    // Call Yoco Checkouts API
+    const yocoResp = await fetch("https://payments.yoco.com/api/checkouts", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${yocoSecretKey}`,
+        "Authorization": `Bearer ${yocoSecretKey.trim()}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(paymentLinkBody),
+      body: JSON.stringify(checkoutPayload),
     });
 
     const yocoJson = await yocoResp.json();
     if (!yocoResp.ok) {
-      console.log("[yoco-initiate] Yoco API error:", yocoJson?.message || "Unknown error");
+      console.error("[yoco-initiate] Yoco API error:", {
+        status: yocoResp.status,
+        statusText: yocoResp.statusText,
+        message: yocoJson?.message || "Unknown error",
+        error: yocoJson?.error,
+      });
+      
+      // Provide helpful error message for 401
+      let errorDetail = yocoJson?.message || "Yoco API error";
+      if (yocoResp.status === 401 || yocoResp.status === 403) {
+        errorDetail = "Invalid Yoco credentials - check YOCO_SECRET_KEY is correct";
+      }
+      
       return new Response(
-        JSON.stringify({ error: yocoJson?.message || "Yoco API error", details: yocoJson }),
+        JSON.stringify({ error: errorDetail, details: yocoJson }),
         { status: yocoResp.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("[yoco-initiate] Payment link created successfully:", yocoJson.id);
+    console.log("[yoco-initiate] Checkout created successfully:", yocoJson.id);
 
-    // Determine checkout URL
-    const checkoutUrl = yocoJson?.redirectUrl || yocoJson?.url;
-    if (!checkoutUrl) {
-      console.error("[yoco-initiate] Missing checkout URL in Yoco response", yocoJson);
-      return new Response(
-        JSON.stringify({ error: "Invalid payment link response", details: "No checkout URL provided by Yoco" }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Best-effort payment record insertion
+    // Store checkout ID immediately via upsert to ensure webhook correlation is deterministic
     try {
-      await admin.from("payments").insert({
-        order_id: orderId,
-        payment_method: "yoco",
-        provider_reference: yocoJson.id || yocoJson.reference || null,
-        status: "pending",
-        amount: order.total_amount,
-        metadata: { yocoResponse: yocoJson },
-      });
-      console.log("[yoco-initiate] Payment record created for order:", orderId);
+      const { error: upsertErr } = await admin
+        .from("payments")
+        .upsert({
+          order_id: orderId,
+          payment_method: "yoco",
+          provider_reference: yocoJson.id,
+          status: "pending",
+          amount: order.total_amount,
+        }, { onConflict: "order_id" });
+
+      if (upsertErr) {
+        console.error("[yoco-initiate] Warning: Failed to upsert payment record:", upsertErr);
+        // Non-blocking - continue with redirect even if DB fails
+      } else {
+        console.log("[yoco-initiate] Payment record upserted with checkoutId:", yocoJson.id, "for order:", orderId);
+      }
     } catch (paymentDbErr) {
       console.error("[yoco-initiate] Failed to record payment (non-blocking):", paymentDbErr);
+    }
+
+    // Extract redirect URL from response
+    const redirectUrl = yocoJson?.redirectUrl;
+    if (!redirectUrl) {
+      console.error("[yoco-initiate] Missing redirectUrl in Yoco response", yocoJson);
+      return new Response(
+        JSON.stringify({ error: "Invalid checkout response", details: "No redirectUrl provided by Yoco" }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        redirectUrl: checkoutUrl,
+        redirectUrl,
         paymentId: yocoJson.id,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

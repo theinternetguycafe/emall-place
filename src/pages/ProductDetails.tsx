@@ -99,6 +99,16 @@ export default function ProductDetails() {
         Back to Results
       </Button>
 
+      {/* Trust cues */}
+      <div className="flex flex-wrap gap-4 mb-8">
+        <Badge variant="outline" className="border-emerald-200 text-emerald-600 bg-emerald-50 rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest">
+          Secure checkout at next step
+        </Badge>
+        <Badge variant="outline" className="border-blue-200 text-blue-600 bg-blue-50 rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest">
+          Local is lekker
+        </Badge>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
         {/* Image Gallery */}
         <div className="lg:col-span-7 space-y-6">

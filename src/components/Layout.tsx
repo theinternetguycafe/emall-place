@@ -82,7 +82,7 @@ export default function Layout({ children }: LayoutProps) {
                         <Button variant="primary" size="sm" className="rounded-full bg-slate-900">Admin</Button>
                       </Link>
                     )}
-                    <Link to="/account/orders" className="p-3 text-slate-400 hover:text-slate-900 transition-all">
+                    <Link to="/account" className="p-3 text-slate-400 hover:text-slate-900 transition-all">
                       <UserIcon className="h-6 w-6" />
                     </Link>
                     <button 
@@ -131,7 +131,7 @@ export default function Layout({ children }: LayoutProps) {
             <hr className="border-stone-100" />
             {user ? (
               <div className="space-y-4">
-                <Link to="/account/orders" className="block text-lg font-bold text-stone-500" onClick={() => setIsMobileMenuOpen(false)}>My Orders</Link>
+                <Link to="/account" className="block text-lg font-bold text-stone-500" onClick={() => setIsMobileMenuOpen(false)}>Account</Link>
                 {profile?.role === 'seller' && (
                   <Link to="/seller" className="block text-lg font-bold text-stone-500" onClick={() => setIsMobileMenuOpen(false)}>Seller Hub</Link>
                 )}

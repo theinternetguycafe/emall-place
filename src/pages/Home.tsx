@@ -109,11 +109,12 @@ export default function Home() {
 
         <div className="container mx-auto px-4 relative z-10 text-white">
           <div className="max-w-4xl">
+
             <Badge
               variant="outline"
               className="text-white border-white/20 bg-white/10 backdrop-blur-md mb-8 py-2 px-6 rounded-full text-[10px] font-black tracking-[0.2em]"
             >
-              🏪 Shop Premium Items
+              🇿🇦 Local is lekker
             </Badge>
 
             <h1 className="text-7xl md:text-[9rem] font-black leading-[0.85] tracking-tighter mb-10">
@@ -121,8 +122,9 @@ export default function Home() {
               <span className="text-stone-400 italic">Favorites.</span>
             </h1>
 
+
             <p className="text-xl text-stone-300 mb-12 leading-relaxed max-w-xl font-medium">
-              Shop handmade items from independent creators across South Africa. Quality products, fair prices.
+              Shop handmade items from independent creators across Mzansi. Quality goods, fair prices, secure payments powered by Yoco.
             </p>
 
             <div className="flex flex-wrap gap-6">
@@ -157,7 +159,7 @@ export default function Home() {
               <div>
                 <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Secure Payments</h3>
                 <p className="text-stone-400 text-sm font-medium leading-relaxed">
-                  Your money is safe. We use trusted payment providers.
+                  Secure payments powered by <span className="font-bold text-blue-600">Yoco</span>. Only confirm payments you started.
                 </p>
               </div>
             </div>
@@ -167,8 +169,8 @@ export default function Home() {
                 <Truck className="h-10 w-10" />
               </div>
               <div>
-                <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Fast Delivery</h3>
-                <p className="text-stone-400 text-sm font-medium leading-relaxed">Tracked shipping straight to you.</p>
+                <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Free Delivery</h3>
+                <p className="text-stone-400 text-sm font-medium leading-relaxed">Free tracked delivery, anywhere in SA. Fast and reliable.</p>
               </div>
             </div>
 
@@ -178,7 +180,7 @@ export default function Home() {
               </div>
               <div>
                 <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Quality Items</h3>
-                <p className="text-stone-400 text-sm font-medium leading-relaxed">All sellers are checked. Only good stuff here.</p>
+                <p className="text-stone-400 text-sm font-medium leading-relaxed">All sellers checked. Only lekker stuff here, mate.</p>
               </div>
             </div>
           </div>

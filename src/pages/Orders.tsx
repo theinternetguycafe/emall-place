@@ -20,6 +20,14 @@ export default function Orders() {
     if (user) {
       fetchOrders()
     }
+    // Listen for page focus to refresh orders
+    const handleFocus = () => {
+      if (user) fetchOrders()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [user])
 
   const fetchOrders = async () => {
@@ -50,7 +58,12 @@ export default function Orders() {
     }
   }
 
-  const getStatusVariant = (status: string) => {
+  const getStatusVariant = (status: string, paymentStatus: string) => {
+    // If payment is pending/unpaid, show as outline
+    if (paymentStatus === 'unpaid') return 'outline'
+    // If payment failed, show as danger
+    if (paymentStatus === 'failed') return 'danger'
+    // If paid, use order status color
     switch (status) {
       case 'completed': return 'success'
       case 'processing': return 'warning'
@@ -58,6 +71,43 @@ export default function Orders() {
       case 'cancelled': return 'danger'
       default: return 'outline'
     }
+  }
+
+  const getStatusLabel = (status: string, paymentStatus: string) => {
+    // Show meaningful labels based on payment + order status combo
+    if (paymentStatus === 'unpaid') return 'Payment Pending'
+    if (paymentStatus === 'failed') return 'Payment Failed'
+    if (paymentStatus === 'paid') {
+      switch (status) {
+        case 'processing': return 'Awaiting Shipping'
+        case 'completed': return 'Delivered'
+        case 'cancelled': return 'Cancelled'
+        default: return 'Processing'
+      }
+    }
+    return status.charAt(0).toUpperCase() + status.slice(1)
+  }
+
+  const getNextStepMessage = (status: string, paymentStatus: string) => {
+    if (paymentStatus === 'unpaid') {
+      return "Complete your payment to confirm the order."
+    }
+    if (paymentStatus === 'failed') {
+      return "Payment couldn't go through. Please retry or contact support."
+    }
+    if (paymentStatus === 'paid') {
+      switch (status) {
+        case 'processing':
+          return "We'll notify you when the seller ships your order."
+        case 'completed':
+          return "Cheers! Your order has been delivered."
+        case 'cancelled':
+          return "This order was cancelled. Check your email for details."
+        default:
+          return "We're preparing your order."
+      }
+    }
+    return "We're processing your order."
   }
 
   if (loading) {
@@ -139,11 +189,8 @@ export default function Orders() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge variant={getStatusVariant(order.status) as any} className="py-1.5 px-4 rounded-full font-black uppercase tracking-widest text-[9px] bg-white/10 border-white/20 text-white">
-                        {order.status}
-                      </Badge>
-                      <Badge variant={order.payment_status === 'paid' ? 'success' : 'outline'} className="py-1.5 px-4 rounded-full font-black uppercase tracking-widest text-[9px]">
-                        {order.payment_status}
+                      <Badge variant={getStatusVariant(order.status, order.payment_status) as any} className="py-1.5 px-4 rounded-full font-black uppercase tracking-widest text-[9px] bg-white/10 border-white/20 text-white">
+                        {getStatusLabel(order.status, order.payment_status)}
                       </Badge>
                     </div>
                   </div>
@@ -195,14 +242,20 @@ export default function Orders() {
                 </div>
 
                 {/* Footer/Action */}
-                <div className="bg-stone-50 px-8 py-4 border-t border-stone-100 flex justify-between items-center">
-                   <div className="flex items-center gap-2 text-stone-400">
+                <div className="bg-stone-50 px-8 py-6 border-t border-stone-100">
+                  <div className="mb-4">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-2">What happens next?</p>
+                    <p className="text-sm text-stone-600 leading-relaxed">{getNextStepMessage(order.status, order.payment_status)}</p>
+                  </div>
+                  <div className="flex justify-between items-center pt-4 border-t border-stone-100">
+                    <div className="flex items-center gap-2 text-stone-400">
                       <Receipt className="h-4 w-4" />
                       <span className="text-[10px] font-bold uppercase tracking-widest">Invoice</span>
-                   </div>
-                   <Button variant="ghost" size="sm" className="text-slate-900 font-bold uppercase tracking-widest text-[10px]">
+                    </div>
+                    <Button variant="ghost" size="sm" className="text-slate-900 font-bold uppercase tracking-widest text-[10px]">
                       Download
-                   </Button>
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))}

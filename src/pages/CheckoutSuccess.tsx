@@ -105,17 +105,17 @@ export default function CheckoutSuccess() {
             </div>
             <div>
               <h1 className="text-5xl font-black text-slate-900 tracking-tight mb-2">
-                {success ? 'All Set!' : 'Order Received'}
+                All Set! 🎉
               </h1>
               <p className="text-stone-500 font-medium">
-                {success ? 'Your payment went through.' : 'Your order is being processed.'}
+                Your payment went through. Your goods are on the way soon.
               </p>
             </div>
           </div>
         </div>
 
         {/* Order Details */}
-        <Card className="p-8 rounded-[2rem] border-stone-100 shadow-sm bg-white">
+        <Card className="p-8 rounded-[2rem] border-stone-100 shadow-sm bg-white mb-8">
           <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
             <ShoppingBag className="h-6 w-6 text-slate-900" />
             Your Order
@@ -123,35 +123,68 @@ export default function CheckoutSuccess() {
           <div className="space-y-4">
             <div className="flex justify-between">
               <span className="text-stone-400 font-medium">Order ID:</span>
-              <span className="font-bold text-slate-900">#{orderId?.slice(0, 8).toUpperCase()}</span>
+              <span className="font-bold text-slate-900 font-mono">#{orderId?.slice(0, 8).toUpperCase()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-stone-400 font-medium">Status:</span>
-              <span className={`font-bold ${success ? 'text-emerald-600' : 'text-amber-600'}`}>
-                {success ? 'Paid' : 'Processing'}
-              </span>
+              <span className="font-bold text-emerald-600">Payment Confirmed ✓</span>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 mt-6">
+              <p className="text-sm text-emerald-900">
+                <span className="font-bold">What happens next?</span> We'll notify you when the seller ships your order. Keep an eye on your email for updates.
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Next Steps */}
+        <Card className="p-8 rounded-[2rem] border-stone-100 shadow-sm bg-white mb-8">
+          <h2 className="text-lg font-bold mb-6">Next Steps</h2>
+          <div className="space-y-4">
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm">1</div>
+              <div>
+                <p className="font-bold text-slate-900">Seller Confirmation</p>
+                <p className="text-sm text-stone-500">The seller will confirm and prepare your order.</p>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm">2</div>
+              <div>
+                <p className="font-bold text-slate-900">Shipping Notification</p>
+                <p className="text-sm text-stone-500">You'll get an email when your order ships.</p>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-sm">3</div>
+              <div>
+                <p className="font-bold text-slate-900">Track Your Order</p>
+                <p className="text-sm text-stone-500">Use "My Orders" to track delivery progress.</p>
+              </div>
             </div>
           </div>
         </Card>
 
         {/* Actions */}
-        <div className="flex gap-4 mt-8">
+        <div className="flex gap-4">
+          <Button
+            onClick={() => navigate('/account/orders')}
+            className="flex-1 rounded-full py-6 font-black shadow-xl bg-slate-900 hover:bg-slate-800"
+          >
+            <Home className="h-5 w-5 mr-2" />
+            View Your Orders
+          </Button>
           <Button
             onClick={handleContinueShopping}
             variant="outline"
             className="flex-1 rounded-full py-6 font-black"
           >
-            <Home className="h-5 w-5 mr-2" />
+            <ShoppingBag className="h-5 w-5 mr-2" />
             Continue Shopping
-          </Button>
-          <Button
-            onClick={() => navigate('/account/orders')}
-            className="flex-1 rounded-full py-6 font-black shadow-xl"
-          >
-            View My Orders
           </Button>
         </div>
       </div>
     </div>
+
   )
 }

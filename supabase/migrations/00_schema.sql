@@ -69,7 +69,7 @@ create table public.cart_items (
 create table public.orders (
   id uuid default uuid_generate_v4() primary key,
   buyer_id uuid references public.profiles(id) on delete set null,
-  status text not null default 'pending' check (status in ('pending', 'processing', 'completed', 'cancelled')),
+  status text not null default 'pending' check (status in ('pending', 'processing', 'completed', 'cancelled', 'failed')),
   total_amount decimal(12,2) not null,
   total_commission decimal(12,2) not null,
   payment_status text not null default 'unpaid' check (payment_status in ('unpaid', 'paid', 'failed')),

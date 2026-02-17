@@ -19,7 +19,9 @@ import CheckoutCancelled from './pages/CheckoutCancelled'
 import Orders from './pages/Orders'
 import AdminDashboard from './pages/AdminDashboard'
 
+
 import ProtectedRoute from './components/ProtectedRoute'
+import Account from './pages/Account'
 
 function App() {
   return (
@@ -69,6 +71,14 @@ function App() {
                 } 
               />
               
+              <Route 
+                path="/account" 
+                element={
+                  <ProtectedRoute>
+                    <Account />
+                  </ProtectedRoute>
+                } 
+              />
               <Route 
                 path="/account/orders" 
                 element={

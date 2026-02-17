@@ -6,7 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import { supabase } from '../lib/supabase'
 import { createYocoPaymentLink, verifyYocoPaymentStatus } from '../lib/yoco'
 import { generateSnapScanQR, verifySnapScanPaymentStatus } from '../lib/snapscan'
-import { ShieldCheck, Loader2, CreditCard, ArrowLeft, Lock, Zap, QrCode } from 'lucide-react'
+import { ShieldCheck, Loader2, CreditCard, ArrowLeft, Lock, Zap, QrCode, CheckCircle, XCircle } from 'lucide-react'
 import ErrorAlert from '../components/ErrorAlert'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -25,6 +25,8 @@ export default function Checkout() {
   const [polling, setPolling] = useState(false)
   const [snapScanQR, setSnapScanQR] = useState<string | null>(null)
   const [showSnapScanQR, setShowSnapScanQR] = useState(false)
+  const [returningFromPayment, setReturningFromPayment] = useState(false)
+  const [paymentStatus, setPaymentStatus] = useState<'processing' | 'success' | 'failed' | null>(null)
 
   const handleCheckoutFailure = async (orderId: string, reason: string) => {
     try {
@@ -48,11 +50,53 @@ export default function Checkout() {
     // 1) Block duplicate checkout + ensure valid state
     if (loading || polling || authLoading) return
     
+    // 2) If returning from payment, do NOT create a new order - just use the existing one
+    if (returningFromPayment && orderId) {
+      // For failed payments, user can retry with same order
+      if (paymentStatus === 'failed') {
+        setError(null)
+        setPaymentStatus('processing')
+        setLoading(true)
+
+        try {
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+          
+          if (sessionError || !session?.access_token) {
+            throw new Error('Your session has expired. Please sign in again.')
+          }
+
+          // Reinitiate payment for the same order
+          const { redirectUrl, error: paymentError } = await createYocoPaymentLink(
+            orderId,
+            totalAmount,
+            items.map(item => ({
+              ...item,
+              itemTotal: Number((item.product.price * item.quantity).toFixed(2)),
+              commissionAmount: Number((item.product.price * item.quantity * 0.08).toFixed(2))
+            })),
+            session.access_token,
+            session.user.email,
+            profile?.full_name || undefined
+          )
+
+          if (paymentError) throw new Error(paymentError)
+          window.location.href = redirectUrl
+        } catch (err: any) {
+          console.error('[Checkout] Retry payment error:', err)
+          setError(err.message || 'Failed to retry payment. Please try again.')
+          setPaymentStatus('failed')
+        } finally {
+          setLoading(false)
+        }
+      }
+      return
+    }
+    
     setError(null)
     let currentOrderId: string | null = null
 
     try {
-      // 2) Fetch fresh session & verify token
+      // 3) Fetch fresh session & verify token
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
       if (sessionError || !session?.access_token) {
@@ -75,7 +119,7 @@ export default function Checkout() {
 
       const totalCommission = calculatedItems.reduce((sum, item) => sum + item.commissionAmount, 0)
 
-      // 3) Create order
+      // 4) Create order
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -153,10 +197,26 @@ export default function Checkout() {
   // Poll for payment status when returning from payment redirect
   useEffect(() => {
     const orderIdParam = searchParams.get('order_id')
-    const status = searchParams.get('status')
+    const statusParam = searchParams.get('status')
 
-    if (orderIdParam && status === 'success') {
-      pollPaymentStatus(orderIdParam, 'yoco')
+    if (orderIdParam) {
+      setOrderId(orderIdParam)
+      setReturningFromPayment(true)
+
+      if (statusParam === 'success') {
+        // Payment was successful, start polling
+        setPaymentStatus('processing')
+        setError(null)
+        pollPaymentStatus(orderIdParam, 'yoco')
+      } else if (statusParam === 'failed') {
+        // Payment failed
+        setPaymentStatus('failed')
+        setError("Payment didn't go through. Please try again or use a different payment method.")
+      } else if (statusParam === 'cancelled') {
+        // Payment was cancelled
+        setPaymentStatus('failed')
+        setError('Payment was cancelled. Feel free to try again.')
+      }
     }
   }, [searchParams])
 
@@ -189,10 +249,12 @@ export default function Checkout() {
         if (paid) {
           clearInterval(pollInterval)
           setPolling(false)
+          setPaymentStatus('success')
           setShowSnapScanQR(false)
+          // Only clear cart after payment is confirmed
           clearCart()
           addToast('Payment received! 🎉', 'success')
-          navigate('/account/orders')
+          setTimeout(() => navigate('/account/orders'), 2000)
           return
         }
 
@@ -200,6 +262,7 @@ export default function Checkout() {
           clearInterval(pollInterval)
           setPolling(false)
           setShowSnapScanQR(false)
+          setPaymentStatus('failed')
           setError(status === 'failed' ? "Payment didn't go through." : 'Payment was cancelled.')
           return
         }
@@ -208,24 +271,20 @@ export default function Checkout() {
           clearInterval(pollInterval)
           setPolling(false)
           setShowSnapScanQR(false)
+          setPaymentStatus('failed')
           setError('Payment verification timed out. Please contact support.')
         }
       }, 10000) // Poll every 10 seconds
 
     } catch (error) {
       setPolling(false)
+      setPaymentStatus('failed')
       setShowSnapScanQR(false)
       console.error('[Checkout] Polling error:', error)
       setError('Payment check failed. Please try again.')
     }
   }
 
-  if (items.length === 0) {
-    navigate('/shop')
-    return null
-  }
-
-  // Show loading state while auth is being determined
   if (authLoading) {
     return (
       <div className="container mx-auto px-4 py-16 max-w-5xl">
@@ -241,6 +300,99 @@ export default function Checkout() {
   if (!user) {
     navigate('/auth')
     return null
+  }
+
+  // Show payment processing screen when returning from payment
+  if (returningFromPayment && orderId && paymentStatus === 'processing') {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-5xl">
+        <div className="flex flex-col items-center justify-center min-h-[50vh]">
+          <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center max-w-md">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-6" />
+            <h2 className="text-2xl font-black text-slate-900 mb-2">Payment Processing</h2>
+            <p className="text-stone-500 mb-6">
+              We're confirming your payment. This usually takes a few seconds...
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-900">
+                <span className="font-bold">Order ID:</span> {orderId}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show success screen when payment is confirmed
+  if (returningFromPayment && orderId && paymentStatus === 'success') {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-5xl">
+        <div className="flex flex-col items-center justify-center min-h-[50vh]">
+          <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center max-w-md">
+            <CheckCircle className="h-16 w-16 text-emerald-600 mx-auto mb-6" />
+            <h2 className="text-2xl font-black text-slate-900 mb-2">Payment Successful!</h2>
+            <p className="text-stone-500 mb-6">
+              Thank you for your order. Your items will be processed shortly.
+            </p>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-emerald-900">
+                <span className="font-bold">Order ID:</span> {orderId}
+              </p>
+            </div>
+            <Button
+              onClick={() => navigate('/account/orders')}
+              className="w-full bg-slate-900 text-white hover:bg-slate-800"
+            >
+              View Your Orders
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show failure screen when returning with failed/cancelled status
+  if (returningFromPayment && orderId && paymentStatus === 'failed') {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-5xl">
+        <div className="flex flex-col items-center justify-center min-h-[50vh]">
+          <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center max-w-md">
+            <XCircle className="h-16 w-16 text-red-600 mx-auto mb-6" />
+            <h2 className="text-2xl font-black text-slate-900 mb-2">Payment Failed</h2>
+            {error && <p className="text-stone-600 mb-6">{error}</p>}
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-red-900">
+                <span className="font-bold">Order ID:</span> {orderId}
+              </p>
+            </div>
+            <div className="space-y-3">
+              <Button
+                onClick={handleCheckout}
+                disabled={loading}
+                className="w-full bg-blue-600 text-white hover:bg-blue-700"
+              >
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="animate-spin h-4 w-4" />
+                    <span>Retrying...</span>
+                  </div>
+                ) : (
+                  'Try Payment Again'
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/cart')}
+                className="w-full"
+              >
+                Back to Cart
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -267,7 +419,9 @@ export default function Checkout() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div className="lg:col-span-7 space-y-8">
-          <form onSubmit={handleCheckout} className="space-y-8">
+          {/* Show form only if not returning from successful payment */}
+          {!(returningFromPayment && orderId && (paymentStatus === 'processing' || paymentStatus === 'success')) && (
+            <form onSubmit={handleCheckout} className="space-y-8">
             <section>
             <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm">1</div>
@@ -326,16 +480,12 @@ export default function Checkout() {
 
                     <button
                       type="button"
-                      onClick={() => setPaymentMethod('snapscan')}
-                      className={`p-4 rounded-xl border-2 transition-all text-left ${
-                        paymentMethod === 'snapscan'
-                          ? 'border-purple-600 bg-purple-50'
-                          : 'border-stone-200 bg-white hover:border-purple-300'
-                      }`}
+                      disabled
+                      className="p-4 rounded-xl border-2 border-stone-200 bg-stone-50 text-left opacity-50 cursor-not-allowed"
                     >
-                      <QrCode className="h-5 w-5 mb-2 text-purple-600" />
-                      <p className="font-bold text-sm">SnapScan</p>
-                      <p className="text-xs text-stone-500">QR scan payment</p>
+                      <QrCode className="h-5 w-5 mb-2 text-purple-400" />
+                      <p className="font-bold text-sm text-purple-400">SnapScan</p>
+                      <p className="text-xs text-purple-400">Coming soon</p>
                     </button>
 
                     <button
@@ -379,7 +529,8 @@ export default function Checkout() {
               )}
             </Card>
           </section>
-          </form>
+            </form>
+          )}
         </div>
 
         <div className="lg:col-span-5">
