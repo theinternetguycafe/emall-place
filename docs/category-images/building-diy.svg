@@ -1,0 +1,17 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="diyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F97316;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#DC2626;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" fill="url(#diyGrad)"/>
+  <!-- Hammer -->
+  <rect x="60" y="50" width="12" height="90" fill="#92400E" rx="2"/>
+  <!-- Hammer head -->
+  <rect x="45" y="40" width="42" height="25" rx="3" fill="#6B7280"/>
+  <!-- Nail -->
+  <line x1="100" y1="140" x2="100" y2="170" stroke="#9CA3AF" stroke-width="3"/>
+  <!-- Nail point -->
+  <polygon points="100,170 98,165 102,165" fill="#9CA3AF"/>
+</svg>
