@@ -152,42 +152,42 @@ export default function ProductDetails() {
                   navigate(`/shop?store=${storeId}`)
                 }
               }}
-              className="flex items-center gap-2 text-stone-600 hover:text-slate-900 transition-colors mb-4 group"
+              className="inline-flex items-center gap-2 bg-stone-100 px-4 py-2 rounded-full text-stone-600 hover:bg-stone-200 hover:text-slate-900 transition-colors mb-6 group"
             >
               <Store className="h-4 w-4 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-black uppercase tracking-[0.2em] hover:underline">
-                {(product as any).seller_store?.store_name}
+              <span className="text-xs font-black uppercase tracking-[0.2em]">
+                Sold by {(product as any).seller_store?.store_name || 'Local Seller'}
               </span>
             </button>
-            <h1 className="text-5xl font-black text-slate-900 tracking-tight mb-4 leading-[1.1]">{product.title}</h1>
+            <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-4 leading-[1.1]">{product.title}</h1>
             <div className="flex items-center gap-4 mb-8">
               <span className="text-4xl font-black text-slate-900 tracking-tight">R {product.price.toLocaleString()}</span>
               {product.stock > 0 ? (
-                <Badge variant="success" className="rounded-full px-3 py-1">In Stock</Badge>
+                <Badge variant="success" className="rounded-full px-4 py-1.5 font-bold">In Stock</Badge>
               ) : (
-                <Badge variant="error" className="rounded-full px-3 py-1">Sold Out</Badge>
+                <Badge variant="error" className="rounded-full px-4 py-1.5 font-bold">Sold Out</Badge>
               )}
             </div>
           </div>
           
-          <div className="prose prose-stone mb-10">
-            <h3 className="text-sm font-black uppercase tracking-widest text-stone-400 mb-4">The Detail</h3>
+          <div className="prose prose-stone mb-10 max-w-none">
+            <h3 className="text-sm font-black uppercase tracking-widest text-stone-400 mb-4">Product Description</h3>
             <p className="text-stone-600 text-lg leading-relaxed whitespace-pre-line">{product.description}</p>
           </div>
 
           <div className="space-y-8 mt-auto pt-10 border-t border-stone-100">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="flex flex-col items-center text-center gap-2">
-                <Truck className="h-5 w-5 text-stone-400" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Fast Delivery</span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="flex flex-col items-center text-center gap-2 p-4 rounded-2xl bg-stone-50">
+                <Truck className="h-6 w-6 text-blue-500" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-600">Nationwide Delivery</span>
               </div>
-              <div className="flex flex-col items-center text-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-stone-400" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Secure Store</span>
+              <div className="flex flex-col items-center text-center gap-2 p-4 rounded-2xl bg-stone-50">
+                <ShieldCheck className="h-6 w-6 text-emerald-500" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-600">Secure Yoco Pay</span>
               </div>
-              <div className="flex flex-col items-center text-center gap-2">
-                <RefreshCw className="h-5 w-5 text-stone-400" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Easy Returns</span>
+              <div className="flex flex-col items-center text-center gap-2 p-4 rounded-2xl bg-stone-50">
+                <RefreshCw className="h-6 w-6 text-amber-500" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-600">Trusted Seller</span>
               </div>
             </div>
 
@@ -200,12 +200,12 @@ export default function ProductDetails() {
               {adding ? (
                 <div className="flex items-center gap-3">
                   <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Adding...</span>
+                  <span>Adding to Cart...</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
                   <ShoppingCart className="h-6 w-6 group-hover:-translate-y-1 transition-transform" />
-                  <span>Secure for Bag</span>
+                  <span>Add to Cart</span>
                 </div>
               )}
             </Button>

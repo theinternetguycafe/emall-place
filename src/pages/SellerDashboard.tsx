@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTour } from '../contexts/TourContext'
 import { Product, SellerStore } from '../types'
-import { Plus, Package, Edit2, Trash2, ShoppingBag, TrendingUp, Users, ArrowUpRight, Search, Filter, Store as StoreIcon, AlertCircle, X } from 'lucide-react'
+import { Plus, Package, Edit2, Trash2, ShoppingBag, TrendingUp, Users, ArrowUpRight, Search, Filter, Store as StoreIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -19,7 +18,6 @@ import { useOnboarding } from '../contexts/OnboardingContext'
 const PENDING_SELLER_TOUR_KEY = 'pendingSellerSpotlightTour'
 
 export default function SellerDashboard() {
-  const navigate = useNavigate()
   const { profile } = useAuth()
   const { startTour } = useTour()
   const { completeStep, isComplete, celebrationPending, skipStep } = useOnboarding()
@@ -28,10 +26,10 @@ export default function SellerDashboard() {
   const [orderItems, setOrderItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'products' | 'orders'>('products')
+  const [searchQuery, setSearchQuery] = useState('')
   const [showStoreForm, setShowStoreForm] = useState(false)
   const [storeName, setStoreName] = useState('')
   const [creatingStore, setCreatingStore] = useState(false)
-  const [showCelebration, setShowCelebration] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [editingStore, setEditingStore] = useState(false)
   const [storeForm, setStoreForm] = useState({ store_name: '', description: '' })
@@ -41,13 +39,6 @@ export default function SellerDashboard() {
 
     fetchData()
   }, [profile?.id])
-
-  useEffect(() => {
-    if (isComplete && !localStorage.getItem('celebrationShown')) {
-      setShowCelebration(true)
-      localStorage.setItem('celebrationShown', 'true')
-    }
-  }, [isComplete])
 
   useEffect(() => {
     if (loading) return
@@ -191,6 +182,17 @@ export default function SellerDashboard() {
   const storeCompletion = getStoreCompletion()
   const isStoreComplete = storeCompletion === 100
 
+  const filteredProducts = products.filter(p => 
+    p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    p.id.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const filteredOrders = orderItems.filter(o => 
+    o.orders.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    o.products?.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (o.orders.profiles?.full_name || 'Guest').toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   if (loading) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-12">
@@ -215,17 +217,17 @@ export default function SellerDashboard() {
         {!showStoreForm ? (
           <Card className="max-w-md w-full text-center p-12 rounded-[2.5rem] border-stone-100 shadow-2xl bg-white">
             <div className="w-20 h-20 bg-stone-50 rounded-full flex items-center justify-center mx-auto mb-8">
-              <ShoppingBag className="h-8 w-8 text-stone-300" />
+              <StoreIcon className="h-8 w-8 text-stone-300" />
             </div>
-            <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight mb-4">Initialize Workshop</h2>
-            <p className="text-stone-500 mb-10 font-medium">You haven't established your merchant profile yet. Set up your store to start showcasing your craft.</p>
+            <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight mb-4">Open Your Store</h2>
+            <p className="text-stone-500 mb-10 font-medium">You haven't established your digital storefront yet. Set up your store to start selling to the community.</p>
             <Button
               size="lg"
               data-tour="store-create-cta"
               onClick={() => setShowStoreForm(true)}
               className="w-full rounded-2xl shadow-xl shadow-slate-200 uppercase tracking-widest font-black text-xs py-8"
             >
-              Complete Setup
+              Start Selling
             </Button>
           </Card>
         ) : (
@@ -307,16 +309,16 @@ export default function SellerDashboard() {
           <div>
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-stone-400 mb-4">
               <TrendingUp className="h-3 w-3" />
-              <span>Merchant Console</span>
+              <span>Store Dashboard</span>
             </div>
             <h1 className="text-5xl font-black tracking-tighter text-slate-900 uppercase">{store.store_name}</h1>
-            <p className="text-stone-500 mt-2 font-medium">Managing your professional inventory and fulfillment.</p>
+            <p className="text-stone-500 mt-2 font-medium">Manage your products and view your incoming orders.</p>
           </div>
           <div className="flex gap-4">
             <Link to="/seller/products/new" className="inline-flex">
               <span data-tour="product-create-button" data-onboarding="add-product-btn" id="create-product-button" className="inline-flex items-center justify-center rounded-full px-8 py-6 gap-2 shadow-lg shadow-slate-200 bg-slate-900 text-white hover:bg-slate-800 font-semibold transition-all active:scale-[0.98] cursor-pointer">
                 <Plus className="h-5 w-5" />
-                Add New Craft
+                Add Product
               </span>
             </Link>
           </div>
@@ -522,16 +524,18 @@ export default function SellerDashboard() {
               </button>
             </div>
 
-            <div className="flex items-center gap-4">
-               <div className="relative">
+            <div className="flex items-center gap-4 w-full md:w-auto mt-4 md:mt-0">
+               <div className="relative flex-1 md:flex-none">
                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-300" />
                  <input 
                   type="text" 
                   placeholder="Filter items..." 
-                  className="pl-11 pr-4 py-2.5 bg-stone-50 border-none rounded-full text-xs font-bold focus:ring-2 focus:ring-slate-900/10 focus:bg-white transition-all outline-none w-64"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-11 pr-4 py-2.5 bg-stone-50 border-none rounded-full text-xs font-bold focus:ring-2 focus:ring-slate-900/10 focus:bg-white transition-all outline-none w-full md:w-64 text-slate-900"
                  />
                </div>
-               <Button variant="outline" size="sm" className="rounded-full border-stone-100 h-10 w-10 p-0">
+               <Button variant="outline" size="sm" className="rounded-full border-stone-100 h-10 w-10 p-0 flex-shrink-0">
                  <Filter className="h-4 w-4" />
                </Button>
             </div>
@@ -539,18 +543,18 @@ export default function SellerDashboard() {
 
           <div className="overflow-x-auto">
             {activeTab === 'products' ? (
-              <table className="w-full text-left">
+              <table className="w-full min-w-[800px] text-left">
                 <thead>
                   <tr className="bg-stone-50/50">
-                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Item Details</th>
-                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Valuation</th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Product Details</th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Price</th>
                     <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Stock</th>
                     <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Status</th>
                     <th className="px-8 py-4 text-right text-[10px] font-black uppercase tracking-widest text-stone-400">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-50 bg-white">
-                  {products.map((product) => (
+                  {filteredProducts.map((product) => (
                     <tr key={product.id} className="group hover:bg-stone-50/30 transition-colors">
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-4">
@@ -592,12 +596,14 @@ export default function SellerDashboard() {
                       </td>
                     </tr>
                   ))}
-                  {products.length === 0 && (
+                  {filteredProducts.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-8 py-24 text-center">
                          <div className="max-w-xs mx-auto text-center">
                             <Package className="h-12 w-12 text-stone-200 mx-auto mb-4" />
-                            <p className="text-stone-400 text-sm font-medium italic">Your inventory is currently empty. Start adding your unique products to showcase them in the marketplace.</p>
+                            <p className="text-stone-400 text-sm font-medium italic">
+                              {searchQuery ? "No products found matching your search." : "Your inventory is currently empty. Start adding your unique products to showcase them in the marketplace."}
+                            </p>
                          </div>
                       </td>
                     </tr>
@@ -605,19 +611,19 @@ export default function SellerDashboard() {
                 </tbody>
               </table>
             ) : (
-              <table className="w-full text-left">
+              <table className="w-full min-w-[800px] text-left">
                 <thead>
                   <tr className="bg-stone-50/50">
-                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Order Ref</th>
-                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Acquirer</th>
-                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Item</th>
-                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Investment</th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Order ID</th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Customer</th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Product</th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Amount</th>
                     <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Status</th>
                     <th className="px-8 py-4 text-right text-[10px] font-black uppercase tracking-widest text-stone-400">Manage</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-50 bg-white">
-                  {orderItems.map((item) => (
+                  {filteredOrders.map((item) => (
                     <tr key={item.id} className="group hover:bg-stone-50/30 transition-colors">
                       <td className="px-8 py-6">
                         <div className="text-sm font-bold text-slate-900">#{item.orders.id.slice(0, 8).toUpperCase()}</div>
@@ -667,12 +673,14 @@ export default function SellerDashboard() {
                       </td>
                     </tr>
                   ))}
-                  {orderItems.length === 0 && (
+                  {filteredOrders.length === 0 && (
                     <tr>
                       <td colSpan={6} className="px-8 py-24 text-center">
                          <div className="max-w-xs mx-auto text-center">
                             <ShoppingBag className="h-12 w-12 text-stone-200 mx-auto mb-4" />
-                            <p className="text-stone-400 text-sm font-medium italic">No orders have been placed for your items yet. They will appear here once acquired.</p>
+                            <p className="text-stone-400 text-sm font-medium italic">
+                              {searchQuery ? "No orders found matching your search." : "No orders have been placed for your items yet. They will appear here once acquired."}
+                            </p>
                          </div>
                       </td>
                     </tr>

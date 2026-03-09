@@ -183,19 +183,19 @@ export default function Home() {
 
             <Badge
               variant="outline"
-              className="text-white border-white/20 bg-white/10 backdrop-blur-md mb-8 py-2 px-6 rounded-full text-[10px] font-black tracking-[0.2em]"
+              className="text-white border-white/20 bg-white/10 backdrop-blur-md mb-8 py-2 px-6 rounded-full text-[10px] font-black tracking-[0.2em] flex items-center gap-2 w-max"
             >
-              🇿🇦 Local is lekker
+              <img src="https://flagcdn.com/w20/za.png" alt="South Africa Flag" className="h-3 w-auto object-contain" /> Support Local Business
             </Badge>
 
-            <h1 className="text-7xl md:text-[9rem] font-black leading-[0.85] tracking-tighter mb-10">
-              Find Your <br />
-              <span className="text-stone-400 italic">Favorites.</span>
+            <h1 className="text-6xl md:text-[7rem] font-black leading-[0.85] tracking-tighter mb-10 text-white">
+              Discover amazing <br />
+              products from <br />
+              <span className="text-stone-400 italic">LOCAL SELLERS.</span>
             </h1>
 
-
             <p className="text-xl text-stone-300 mb-12 leading-relaxed max-w-xl font-medium">
-              Shop handmade items from independent creators across Mzansi. Quality goods, fair prices, secure payments powered by Yoco.
+              Shop directly from independent creators across Mzansi. Quality goods, fair prices, secure payments powered by Yoco.
             </p>
 
             <div className="flex flex-wrap gap-6">
@@ -224,34 +224,34 @@ export default function Home() {
         <Card className="p-0 overflow-hidden border-none shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] rounded-[2.5rem] bg-white">
           <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-stone-100">
             <div className="p-12 flex flex-col items-center text-center gap-6 group">
-              <div className="bg-stone-50 p-5 rounded-3xl text-slate-900 group-hover:scale-110 transition-transform duration-500">
+              <div className="bg-emerald-50 text-emerald-600 p-5 rounded-3xl group-hover:scale-110 group-hover:bg-emerald-100 transition-all duration-500">
                 <ShieldCheck className="h-10 w-10" />
               </div>
               <div>
                 <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Secure Payments</h3>
-                <p className="text-stone-400 text-sm font-medium leading-relaxed">
+                <p className="text-stone-500 text-sm font-medium leading-relaxed">
                   Secure payments powered by <span className="font-bold text-blue-600">Yoco</span>. Only confirm payments you started.
                 </p>
               </div>
             </div>
 
             <div className="p-12 flex flex-col items-center text-center gap-6 group">
-              <div className="bg-stone-50 p-5 rounded-3xl text-slate-900 group-hover:scale-110 transition-transform duration-500">
+              <div className="bg-blue-50 text-blue-600 p-5 rounded-3xl group-hover:scale-110 group-hover:bg-blue-100 transition-all duration-500">
                 <Truck className="h-10 w-10" />
               </div>
               <div>
                 <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Safe Delivery</h3>
-                <p className="text-stone-400 text-sm font-medium leading-relaxed">Reliable and fast tracked delivery across South Africa. Your goods, safely to your door.</p>
+                <p className="text-stone-500 text-sm font-medium leading-relaxed">Reliable and fast tracked delivery across South Africa. Your goods, safely to your door.</p>
               </div>
             </div>
 
             <div className="p-12 flex flex-col items-center text-center gap-6 group">
-              <div className="bg-stone-50 p-5 rounded-3xl text-slate-900 group-hover:scale-110 transition-transform duration-500">
+              <div className="bg-amber-50 text-amber-500 p-5 rounded-3xl group-hover:scale-110 group-hover:bg-amber-100 transition-all duration-500">
                 <Star className="h-10 w-10" />
               </div>
               <div>
                 <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Quality Items</h3>
-                <p className="text-stone-400 text-sm font-medium leading-relaxed">All sellers checked. Only lekker stuff here, mate.</p>
+                <p className="text-stone-500 text-sm font-medium leading-relaxed">Every seller is vetted to ensure you get exactly what you ordered.</p>
               </div>
             </div>
           </div>

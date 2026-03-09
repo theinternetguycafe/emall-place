@@ -26,7 +26,11 @@ import CheckoutSuccess from './pages/CheckoutSuccess'
 import CheckoutCancelled from './pages/CheckoutCancelled'
 import Orders from './pages/Orders'
 import AdminDashboard from './pages/AdminDashboard'
-
+import HelpCentre from './pages/HelpCentre'
+import ShippingPolicy from './pages/ShippingPolicy'
+import ReturnsPolicy from './pages/ReturnsPolicy'
+import SellerGuidelines from './pages/SellerGuidelines'
+import Community from './pages/Community'
 
 import ProtectedRoute from './components/ProtectedRoute'
 import Account from './pages/Account'
@@ -74,6 +78,11 @@ function AppContent() {
           <Route path="/store/:storeId" element={<StoreHome />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
+          <Route path="/help-centre" element={<HelpCentre />} />
+          <Route path="/shipping-policy" element={<ShippingPolicy />} />
+          <Route path="/returns-policy" element={<ReturnsPolicy />} />
+          <Route path="/seller-guidelines" element={<SellerGuidelines />} />
+          <Route path="/community" element={<Community />} />
           
           <Route 
             path="/checkout" 

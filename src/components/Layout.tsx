@@ -175,25 +175,25 @@ export default function Layout({ children }: LayoutProps) {
               <ul className="space-y-4 text-xs font-bold">
                 <li><Link to="/shop" className="hover:text-white transition-colors">The Marketplace</Link></li>
                 <li><Link to="/shop?sort=newest" className="hover:text-white transition-colors">New Arrivals</Link></li>
-                <li><Link to="/shop" className="hover:text-white transition-colors">Curation List</Link></li>
+                <li><Link to="/shop" className="hover:text-white transition-colors">Trending</Link></li>
               </ul>
             </div>
 
             <div>
               <h4 className="text-white text-[10px] font-black uppercase tracking-[0.3em] mb-8">Service</h4>
               <ul className="space-y-4 text-xs font-bold">
-                <li><Link to="/" className="hover:text-white transition-colors">Concierge</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Shipping Etiquette</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Returns & Refinement</Link></li>
+                <li><Link to="/help-centre" className="hover:text-white transition-colors">Help Centre</Link></li>
+                <li><Link to="/shipping-policy" className="hover:text-white transition-colors">Shipping & Delivery</Link></li>
+                <li><Link to="/returns-policy" className="hover:text-white transition-colors">Returns Policy</Link></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="text-white text-[10px] font-black uppercase tracking-[0.3em] mb-8">The Guild</h4>
+              <h4 className="text-white text-[10px] font-black uppercase tracking-[0.3em] mb-8">Sellers</h4>
               <ul className="space-y-4 text-xs font-bold">
-                <li><Link to="/auth" className="hover:text-white transition-colors">Become a Partner</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">Merchant Guidelines</Link></li>
-                <li><Link to="/" className="hover:text-white transition-colors">The Hub</Link></li>
+                <li><Link to="/auth?signup=true" className="hover:text-white transition-colors">Become a Seller</Link></li>
+                <li><Link to="/seller-guidelines" className="hover:text-white transition-colors">Seller Guidelines</Link></li>
+                <li><Link to="/community" className="hover:text-white transition-colors">Community Hub</Link></li>
               </ul>
             </div>
           </div>

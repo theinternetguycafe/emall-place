@@ -104,37 +104,50 @@ export default function StoreHome() {
           </nav>
 
           {/* Store Info Card */}
-          <Card className="p-8 mb-12 bg-gradient-to-br from-slate-50 to-white">
-            <div className="flex items-start gap-6">
-              <div className="flex-shrink-0 w-24 h-24 bg-gradient-to-br from-slate-900 to-slate-700 rounded-2xl flex items-center justify-center">
-                <StoreIcon className="h-12 w-12 text-white" />
+          <div className="relative mb-16 rounded-[2rem] overflow-hidden bg-white shadow-[0_32px_64px_-12px_rgba(0,0,0,0.1)] border border-stone-100">
+            {/* Banner Background */}
+            <div className="h-48 bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-500 w-full relative">
+              <div className="absolute inset-0 bg-black/10 mix-blend-overlay"></div>
+            </div>
+            
+            <div className="px-8 pb-10 relative">
+              <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6 -mt-16 mb-6">
+                <div className="flex-shrink-0 w-32 h-32 bg-white rounded-[2rem] p-2 shadow-xl border border-stone-100 relative z-10">
+                  <div className="w-full h-full bg-slate-900 rounded-2xl flex items-center justify-center">
+                    <StoreIcon className="h-12 w-12 text-white" />
+                  </div>
+                </div>
+                
+                <div className="flex-1 pb-2">
+                  <h1 className="text-4xl sm:text-5xl font-black text-slate-900 mb-2 flex items-center gap-3 tracking-tight">
+                    {store.store_name}
+                    {store.status === 'active' && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full relative -top-2">
+                        ✓ Verified Seller
+                      </span>
+                    )}
+                  </h1>
+                </div>
               </div>
-              <div className="flex-1">
-                <h1 className="text-4xl font-black text-slate-900 mb-2 flex items-center gap-3">
-                  {store.store_name}
-                  {store.status === 'active' && (
-                    <span className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full">
-                      ✓ Active
-                    </span>
-                  )}
-                </h1>
+
+              <div className="max-w-3xl">
                 {store.description ? (
-                  <p className="text-slate-600 text-lg mb-4">{store.description}</p>
+                  <p className="text-stone-600 text-lg mb-6 leading-relaxed">{store.description}</p>
                 ) : (
-                  <p className="text-slate-400 text-lg mb-4 italic">No description provided yet</p>
+                  <p className="text-stone-400 text-lg mb-6 italic">This seller hasn't added a description yet.</p>
                 )}
-                <div className="flex items-center gap-6">
-                  <Badge variant="outline" className="py-2 px-4">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <Badge variant="outline" className="py-2 px-4 rounded-full font-bold">
                     <Package className="h-4 w-4 mr-2 inline" />
-                    {products.length} Products
+                    {products.length} Products Available
                   </Badge>
-                  <Badge variant="outline" className="py-2 px-4">
+                  <Badge variant="outline" className="py-2 px-4 rounded-full font-bold">
                     Joined {new Date(store.created_at).toLocaleDateString()}
                   </Badge>
                 </div>
               </div>
             </div>
-          </Card>
+          </div>
 
           {/* Section Title */}
           <div className="mb-8">

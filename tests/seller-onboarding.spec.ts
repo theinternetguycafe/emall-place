@@ -247,10 +247,10 @@ test('seller registration starts the spotlight immediately and the dashboard che
   await page.getByRole('button', { name: 'Next' }).click()
   await expect(page.getByText('Start by opening your storefront')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Complete Setup' }).click()
+  await page.getByRole('button', { name: 'Start Selling' }).click()
   await expect(page.getByText('Choose a name buyers will remember')).toBeVisible()
 
-  await page.locator('[data-tour="store-name-input"]').fill('Spotlight Atelier')
+  await page.locator('input[placeholder="My Artisan Shop"]').fill('Spotlight Atelier')
   await expect(page.getByText('Choose a name buyers will remember')).toBeVisible()
   await page.getByRole('button', { name: 'Next' }).click()
   await expect(page.getByText('Create the workspace and continue')).toBeVisible()
