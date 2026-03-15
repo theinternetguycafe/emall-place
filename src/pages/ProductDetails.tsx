@@ -4,13 +4,16 @@ import { supabase } from '../lib/supabase'
 import { useCart } from '../contexts/CartContext'
 import { useToast } from '../contexts/ToastContext'
 import { Product } from '../types'
-import { ShoppingCart, ArrowLeft, Store, ShieldCheck, Truck, RefreshCw } from 'lucide-react'
+import { ShoppingCart, ArrowLeft, Store, ShieldCheck, Truck, RefreshCw, Clock } from 'lucide-react'
+import { getSaleInfo } from '../utils/saleUtils'
+import SaleBadge from '../components/SaleBadge'
 import ProductImage from '../components/ProductImage'
 import ErrorAlert from '../components/ErrorAlert'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
 import { Skeleton } from '../components/ui/Skeleton'
+import { Helmet } from 'react-helmet-async'
 
 export default function ProductDetails() {
   const { id } = useParams<{ id: string }>()
@@ -86,9 +89,24 @@ export default function ProductDetails() {
   }
 
   const allImages = product.product_images || []
+  
+  const saleInfo = getSaleInfo({
+    price: product.price,
+    is_on_sale: product.is_on_sale || false,
+    sale_price: product.sale_price || null,
+    sale_starts_at: product.sale_starts_at || null,
+    sale_ends_at: product.sale_ends_at || null,
+    sale_label: product.sale_label || null
+  })
 
   return (
-    <div className="container mx-auto px-4 py-12">
+    <>
+      <Helmet>
+        <title>{product.title} | eMall Place</title>
+        <meta name="description" content={product.description?.slice(0, 160) || `Buy ${product.title} on eMall Place Collective.`} />
+        {allImages[0]?.url && <meta property="og:image" content={allImages[0].url} />}
+      </Helmet>
+      <div className="container mx-auto px-4 py-12">
       <Button
         variant="ghost"
         size="sm"
@@ -118,7 +136,10 @@ export default function ProductDetails() {
               alt={product.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             />
-            {product.stock <= 5 && product.stock > 0 && (
+            {saleInfo.isOnSale && (
+              <SaleBadge label={saleInfo.saleLabel || `${saleInfo.discountPercent}% OFF`} className="top-6 right-6" />
+            )}
+            {!saleInfo.isOnSale && product.stock <= 5 && product.stock > 0 && (
               <Badge variant="warning" className="absolute top-6 left-6 shadow-xl py-1.5 px-4 rounded-full">
                 Only {product.stock} Left
               </Badge>
@@ -161,13 +182,26 @@ export default function ProductDetails() {
             </button>
             <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-4 leading-[1.1]">{product.title}</h1>
             <div className="flex items-center gap-4 mb-8">
-              <span className="text-4xl font-black text-slate-900 tracking-tight">R {product.price.toLocaleString()}</span>
+              <div className="flex items-baseline gap-3">
+                <span className="text-4xl font-black text-slate-900 tracking-tight">R {saleInfo.displayPrice.toLocaleString()}</span>
+                {saleInfo.isOnSale && (
+                  <span className="text-lg text-stone-400 line-through">
+                    R {saleInfo.originalPrice.toLocaleString()}
+                  </span>
+                )}
+              </div>
               {product.stock > 0 ? (
                 <Badge variant="success" className="rounded-full px-4 py-1.5 font-bold">In Stock</Badge>
               ) : (
                 <Badge variant="error" className="rounded-full px-4 py-1.5 font-bold">Sold Out</Badge>
               )}
             </div>
+            {saleInfo.isOnSale && product.sale_ends_at && (
+              <div className="flex items-center gap-2 text-sm text-orange-600 mb-6 bg-orange-50 px-4 py-2 rounded-lg w-fit">
+                <Clock className="h-4 w-4" />
+                <span className="font-medium">Sale ends {new Date(product.sale_ends_at).toLocaleDateString('en-ZA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+            )}
           </div>
           
           <div className="prose prose-stone mb-10 max-w-none">
@@ -213,5 +247,6 @@ export default function ProductDetails() {
         </div>
       </div>
     </div>
+    </>
   )
 }

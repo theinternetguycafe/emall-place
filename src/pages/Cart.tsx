@@ -31,18 +31,18 @@ export default function Cart() {
     return (
       <div className="container mx-auto px-4 py-32 text-center">
         <div className="flex justify-center mb-8">
-          <div className="p-8 bg-stone-100 rounded-full">
-            <ShoppingBag className="h-16 w-16 text-stone-300" />
+          <div className="p-8 bg-gradient-to-br from-stone-100 to-stone-50 rounded-full border border-stone-200 shadow-sm">
+            <ShoppingBag className="h-20 w-20 text-stone-400" />
           </div>
         </div>
         <h2 className="text-4xl font-black text-slate-900 mb-4 tracking-tight">Your cart is empty</h2>
-        <p className="text-stone-500 mb-10 text-lg max-w-md mx-auto">Browse our collection of unique items from independent sellers.</p>
+        <p className="text-stone-500 mb-10 text-lg max-w-md mx-auto">Looks like you haven't added anything yet. Discover our collection of unique items from independent sellers.</p>
         <Button
           size="lg"
           onClick={() => navigate('/shop')}
-          className="rounded-full px-10"
+          className="rounded-full px-10 shadow-lg"
         >
-          Continue Shopping
+          Start Exploring
         </Button>
       </div>
     )

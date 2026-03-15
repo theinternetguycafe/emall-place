@@ -12,6 +12,7 @@ import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
 import { OnboardingModal } from '../components/onboarding/OnboardingModal'
+import { Helmet } from 'react-helmet-async'
 
 export default function Home() {
   const navigate = useNavigate()
@@ -166,6 +167,10 @@ export default function Home() {
 
   return (
     <>
+      <Helmet>
+        <title>eMall Place Collective | South African Marketplace</title>
+        <meta name="description" content="Shop directly from independent creators across Mzansi. Quality goods, fair prices, secure payments." />
+      </Helmet>
       <div className="space-y-32 pb-32">
       {/* HERO */}
       <section className="relative h-[90vh] min-h-[700px] flex items-center overflow-hidden">
@@ -188,10 +193,10 @@ export default function Home() {
               <img src="https://flagcdn.com/w20/za.png" alt="South Africa Flag" className="h-3 w-auto object-contain" /> Support Local Business
             </Badge>
 
-            <h1 className="text-6xl md:text-[7rem] font-black leading-[0.85] tracking-tighter mb-10 text-white">
+            <h1 className="text-6xl md:text-[7rem] pb-4 font-black leading-[0.85] tracking-tighter mb-10 text-white">
               Discover amazing <br />
               products from <br />
-              <span className="text-stone-400 italic">LOCAL SELLERS.</span>
+              <span className="inline-block pt-2 text-stone-400 italic">LOCAL SELLERS.</span>
             </h1>
 
             <p className="text-xl text-stone-300 mb-12 leading-relaxed max-w-xl font-medium">

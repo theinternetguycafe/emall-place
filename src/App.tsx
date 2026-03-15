@@ -38,7 +38,6 @@ import Account from './pages/Account'
 function AppContent() {
   const { isTourOpen, tourType, endTour } = useTour()
   const { completeStep } = useOnboarding()
-  const [isTourCelebrationVisible, setIsTourCelebrationVisible] = useState(false)
 
   const tourSteps = tourType === 'checklist' ? CHECKLIST_TOUR_STEPS : SELLER_TOUR_STEPS
 
@@ -48,8 +47,6 @@ function AppContent() {
         await completeStep('tour_complete')
       } catch (error) {
         console.error('Error completing seller tour step:', error)
-      } finally {
-        setIsTourCelebrationVisible(true)
       }
     }
 
@@ -64,10 +61,6 @@ function AppContent() {
         onClose={endTour}
         onComplete={handleTourComplete}
         steps={tourSteps}
-      />
-      <CompletionCelebration
-        isVisible={isTourCelebrationVisible}
-        onDismiss={() => setIsTourCelebrationVisible(false)}
       />
       <ScrollToTop />
       <Layout>

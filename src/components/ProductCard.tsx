@@ -4,6 +4,8 @@ import { Product } from '../types'
 import { ShoppingBag, Star } from 'lucide-react'
 import { Card } from './ui/Card'
 import { Badge } from './ui/Badge'
+import { getSaleInfo } from '../utils/saleUtils'
+import SaleBadge from './SaleBadge'
 
 interface ProductCardProps {
   product: Product & { seller_store?: { store_name: string } }
@@ -11,6 +13,14 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product, onAddToCart }: ProductCardProps) {
+  const saleInfo = getSaleInfo({
+    price: product.price,
+    is_on_sale: product.is_on_sale || false,
+    sale_price: product.sale_price || null,
+    sale_starts_at: product.sale_starts_at || null,
+    sale_ends_at: product.sale_ends_at || null,
+    sale_label: product.sale_label || null
+  })
   return (
     <Link to={`/product/${product.id}`}>
       <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow duration-300 group cursor-pointer">
@@ -28,20 +38,29 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
             </div>
           )}
           
+          {/* Sale badge */}
+          {saleInfo.isOnSale && (
+            <SaleBadge label={saleInfo.saleLabel || `${saleInfo.discountPercent}% OFF`} />
+          )}
+          
           {/* Stock badge */}
-          {product.stock === 0 ? (
-            <div className="absolute top-3 right-3">
-              <Badge variant="outline" className="bg-rose-50 border-rose-200 text-rose-700 text-xs font-bold">
-                Out of stock
-              </Badge>
-            </div>
-          ) : product.stock < 5 ? (
-            <div className="absolute top-3 right-3">
-              <Badge variant="outline" className="bg-amber-50 border-amber-200 text-amber-700 text-xs font-bold">
-                Low stock
-              </Badge>
-            </div>
-          ) : null}
+          {!saleInfo.isOnSale && (
+            <>
+              {product.stock === 0 ? (
+                <div className="absolute top-3 right-3">
+                  <Badge variant="outline" className="bg-rose-50 border-rose-200 text-rose-700 text-xs font-bold">
+                    Out of stock
+                  </Badge>
+                </div>
+              ) : product.stock < 5 ? (
+                <div className="absolute top-3 right-3">
+                  <Badge variant="outline" className="bg-amber-50 border-amber-200 text-amber-700 text-xs font-bold">
+                    Low stock
+                  </Badge>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
 
         {/* Content */}
@@ -66,10 +85,15 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
           )}
 
           {/* Price */}
-          <div className="flex items-baseline justify-between pt-3 border-t border-stone-100">
+          <div className="flex items-baseline gap-2 pt-3 border-t border-stone-100">
             <span className="text-lg font-black text-slate-900">
-              R {product.price.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              R {saleInfo.displayPrice.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
+            {saleInfo.isOnSale && (
+              <span className="text-xs text-stone-400 line-through">
+                R {saleInfo.originalPrice.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </span>
+            )}
           </div>
         </div>
       </Card>

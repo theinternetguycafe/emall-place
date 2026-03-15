@@ -9,6 +9,7 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
+import { Helmet } from 'react-helmet-async'
 
 export default function StoreHome() {
   const { storeId } = useParams<{ storeId: string }>()
@@ -91,7 +92,12 @@ export default function StoreHome() {
   }
 
   return (
-    <div className="bg-[#F9F8F6] min-h-screen">
+    <>
+      <Helmet>
+        <title>{store.store_name} | eMall Place</title>
+        <meta name="description" content={store.description?.slice(0, 160) || `Shop from ${store.store_name} on eMall Place Collective.`} />
+      </Helmet>
+      <div className="bg-[#F9F8F6] min-h-screen">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         {/* Header Area */}
         <div className="mb-12">
@@ -223,5 +229,6 @@ export default function StoreHome() {
         )}
       </div>
     </div>
+    </>
   )
 }
