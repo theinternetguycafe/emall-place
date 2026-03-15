@@ -10,5 +10,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  base: '/emall-place/',
+  base: '/',
+  build: {
+    outDir: 'docs',
+    emptyOutDir: true
+  }
 })
