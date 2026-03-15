@@ -1,0 +1,18 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="foodGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F59E0B;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B45309;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" fill="url(#foodGrad)"/>
+  <!-- Plate -->
+  <circle cx="80" cy="110" r="35" fill="white"/>
+  <!-- Fork -->
+  <rect x="125" y="60" width="6" height="80" fill="#94A3B8"/>
+  <circle cx="122" cy="55" r="4" fill="#94A3B8"/>
+  <circle cx="131" cy="55" r="4" fill="#94A3B8"/>
+  <circle cx="128" cy="50" r="4" fill="#94A3B8"/>
+  <!-- Food item -->
+  <ellipse cx="80" cy="110" rx="20" ry="15" fill="#FCD34D"/>
+</svg>

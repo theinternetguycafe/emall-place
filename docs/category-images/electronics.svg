@@ -1,0 +1,15 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="elecGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E40AF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" fill="url(#elecGrad)"/>
+  <!-- Smartphone -->
+  <rect x="60" y="40" width="80" height="120" rx="8" fill="white" stroke="#1E40AF" stroke-width="2"/>
+  <rect x="65" y="45" width="70" height="100" fill="#374151"/>
+  <circle cx="100" cy="155" r="4" fill="#999"/>
+  <!-- Screen glow -->
+  <rect x="65" y="45" width="70" height="100" fill="#60A5FA" opacity="0.3"/>
+</svg>
