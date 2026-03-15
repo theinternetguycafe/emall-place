@@ -26,6 +26,7 @@ interface OnboardingContextValue {
   celebrationPending: boolean
   completeStep: (stepId: string) => Promise<void>
   skipStep: (stepId: string) => Promise<void>
+  dismissCelebration: () => void
   isStepDone: (stepId: string) => Promise<boolean>
   refreshProgress: () => Promise<void>
 }
@@ -40,6 +41,7 @@ const DEFAULT_VALUE: OnboardingContextValue = {
   celebrationPending: false,
   completeStep: async () => {},
   skipStep: async () => {},
+  dismissCelebration: () => {},
   isStepDone: async () => false,
   refreshProgress: async () => {}
 }
@@ -136,6 +138,10 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
     }
   }
 
+  const handleDismissCelebration = () => {
+    setCelebrationPending(false)
+  }
+
   const value: OnboardingContextValue = {
     completedSteps,
     nextStep,
@@ -144,6 +150,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
     celebrationPending,
     completeStep: handleCompleteStep,
     skipStep: handleSkipStep,
+    dismissCelebration: handleDismissCelebration,
     isStepDone: handleIsStepDone,
     refreshProgress
   }

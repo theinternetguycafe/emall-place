@@ -5,6 +5,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
+import SalesManagement from '../components/SalesManagement'
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -214,6 +215,11 @@ export default function AdminDashboard() {
             )}
           </Card>
         </section>
+      </div>
+
+      {/* Sales Management */}
+      <div className="mt-16 pt-12 border-t border-stone-100">
+        <SalesManagement isAdmin={true} />
       </div>
     </div>
   )

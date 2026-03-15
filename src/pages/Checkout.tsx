@@ -6,11 +6,57 @@ import { useToast } from '../contexts/ToastContext'
 import { supabase } from '../lib/supabase'
 import { createYocoPaymentLink, verifyYocoPaymentStatus } from '../lib/yoco'
 import { generateSnapScanQR, verifySnapScanPaymentStatus } from '../lib/snapscan'
+import { calculateCartTotals } from '../utils/cartMath'
 import { ShieldCheck, Loader2, CreditCard, ArrowLeft, Lock, Zap, QrCode, CheckCircle, XCircle } from 'lucide-react'
 import ErrorAlert from '../components/ErrorAlert'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
+
+const mapPaymentError = (err: any): string => {
+  const msg = typeof err === 'string' ? err : (err?.message || err?.error || String(err))
+  const lowerMsg = msg.toLowerCase()
+
+  // Network / timeouts
+  if (lowerMsg.includes('failed to fetch') || lowerMsg.includes('fetch failed') || lowerMsg.includes('failed to send a request') || lowerMsg.includes('network') || lowerMsg.includes('offline')) {
+    return 'Network connection lost. Please check your internet and try again.'
+  }
+  if (lowerMsg.includes('timeout') || lowerMsg.includes('time out')) {
+    return 'The connection timed out. Please try again.'
+  }
+
+  // Yoco specific codes & generic patterns
+  if (lowerMsg.includes('card_declined') || lowerMsg.includes('declined')) {
+    return 'Your card was declined by your bank. Please try another card.'
+  }
+  if (lowerMsg.includes('expired_card') || lowerMsg.includes('expired')) {
+    return 'This card has expired. Please use a valid card.'
+  }
+  if (lowerMsg.includes('insufficient_funds')) {
+    return 'Insufficient funds. Please check your balance or use another card.'
+  }
+  if (lowerMsg.includes('invalid_card')) {
+    return 'Invalid card details provided. Please check the number and try again.'
+  }
+  if (lowerMsg.includes('authentication_failed')) {
+    return 'Payment authentication failed. Please try again.'
+  }
+  if (lowerMsg.includes('processing_error')) {
+    return 'Payment processing error. Please try again later.'
+  }
+
+  // Handle generic error responses (never show raw object)
+  if (typeof err === 'object' && err !== null) {
+    return 'Payment could not be completed at this time. Please try again.'
+  }
+
+  // Generic fallback if it's a string but doesn't match above
+  if (lowerMsg.length < 50 && !lowerMsg.includes('object object')) {
+    return msg // If it's a short custom string that was thrown
+  }
+
+  return 'Payment could not be completed at this time. Please try again.'
+}
 
 export default function Checkout() {
   const { items, totalAmount, clearCart } = useCart()
@@ -69,11 +115,7 @@ export default function Checkout() {
           const { redirectUrl, error: paymentError } = await createYocoPaymentLink(
             orderId,
             totalAmount,
-            items.map(item => ({
-              ...item,
-              itemTotal: Number((item.product.price * item.quantity).toFixed(2)),
-              commissionAmount: Number((item.product.price * item.quantity * 0.08).toFixed(2))
-            })),
+            calculateCartTotals(items).items,
             session.access_token,
             session.user.email,
             profile?.full_name || undefined
@@ -106,18 +148,11 @@ export default function Checkout() {
       setLoading(true)
       addToast('Processing payment...', 'info')
 
-      const commissionRate = 0.08
-      const calculatedItems = items.map(item => {
-        const itemTotal = Number((item.product.price * item.quantity).toFixed(2))
-        const commissionAmount = Number((itemTotal * commissionRate).toFixed(2))
-        return {
-          ...item,
-          itemTotal,
-          commissionAmount
-        }
-      })
+      const { items: calculatedItems, totalCommission, totalAmount: mathTotal, reconciled } = calculateCartTotals(items)
 
-      const totalCommission = calculatedItems.reduce((sum, item) => sum + item.commissionAmount, 0)
+      if (!reconciled || Math.abs(totalAmount - mathTotal) > 0.05) {
+        console.warn('[Checkout] Cart totals did not reconcile exactly. Math total:', mathTotal, 'Context total:', totalAmount)
+      }
 
       // 4) Create order
       const { data: order, error: orderError } = await supabase
@@ -181,7 +216,7 @@ export default function Checkout() {
       }
     } catch (err: any) {
       console.error('Checkout error:', err)
-      const errorMessage = err.message || 'Something went wrong. Please try again.'
+      const errorMessage = mapPaymentError(err)
       
       if (currentOrderId) {
         await handleCheckoutFailure(currentOrderId, errorMessage)
@@ -198,6 +233,7 @@ export default function Checkout() {
   useEffect(() => {
     const orderIdParam = searchParams.get('order_id')
     const statusParam = searchParams.get('status')
+    const errorParam = searchParams.get('error') || searchParams.get('errorCode') || searchParams.get('error_description')
 
     if (orderIdParam) {
       setOrderId(orderIdParam)
@@ -211,7 +247,7 @@ export default function Checkout() {
       } else if (statusParam === 'failed') {
         // Payment failed
         setPaymentStatus('failed')
-        setError("Payment didn't go through. Please try again or use a different payment method.")
+        setError(errorParam ? mapPaymentError(errorParam) : "Payment didn't go through. Please try again or use a different payment method.")
       } else if (statusParam === 'cancelled') {
         // Payment was cancelled
         setPaymentStatus('failed')
@@ -228,7 +264,7 @@ export default function Checkout() {
       const maxAttempts = 30 // Poll for up to 5 minutes (30 * 10 seconds)
       let attempts = 0
 
-      const pollInterval = setInterval(async () => {
+      const checkStatus = async () => {
         attempts++
 
         let paid = false
@@ -247,7 +283,7 @@ export default function Checkout() {
         console.log(`[Checkout] Poll attempt ${attempts}:`, { paid, status })
 
         if (paid) {
-          clearInterval(pollInterval)
+          if (pollInterval) clearInterval(pollInterval)
           setPolling(false)
           setPaymentStatus('success')
           setShowSnapScanQR(false)
@@ -255,26 +291,34 @@ export default function Checkout() {
           clearCart()
           addToast('Payment received! 🎉', 'success')
           setTimeout(() => navigate('/account/orders'), 2000)
-          return
+          return true
         }
 
         if (status === 'failed' || status === 'cancelled') {
-          clearInterval(pollInterval)
+          if (pollInterval) clearInterval(pollInterval)
           setPolling(false)
           setShowSnapScanQR(false)
           setPaymentStatus('failed')
           setError(status === 'failed' ? "Payment didn't go through." : 'Payment was cancelled.')
-          return
+          return true
         }
 
         if (attempts >= maxAttempts) {
-          clearInterval(pollInterval)
+          if (pollInterval) clearInterval(pollInterval)
           setPolling(false)
           setShowSnapScanQR(false)
           setPaymentStatus('failed')
           setError('Payment verification timed out. Please contact support.')
+          return true
         }
-      }, 10000) // Poll every 10 seconds
+        return false
+      }
+
+      // Check immediately first
+      const done = await checkStatus()
+      if (done) return
+
+      var pollInterval = setInterval(checkStatus, 10000) // Poll every 10 seconds
 
     } catch (error) {
       setPolling(false)

@@ -16,8 +16,8 @@ export const SELLER_TOUR_STEPS: SpotlightStep[] = [
     optional: true,
     link: '/seller',
     advanceOn: {
-      type: 'click',
-      selector: '[data-tour="store-create-cta"]',
+      type: 'event',
+      eventName: 'store-form-opened',
     },
   },
   {

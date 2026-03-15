@@ -112,7 +112,7 @@ export default function Layout({ children }: LayoutProps) {
                 className="md:hidden p-3 text-slate-900"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               >
-                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                <Menu size={24} />
               </button>
             </div>
           </div>
@@ -121,31 +121,55 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-stone-100 animate-in slide-in-from-top duration-300">
-          <div className="px-4 py-8 space-y-6">
-            <Link 
-              to="/shop" 
-              className="block text-2xl font-black text-slate-900 tracking-tight"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Marketplace
-            </Link>
-            <hr className="border-stone-100" />
-            {!loading ? (
-              user ? (
-                <div className="space-y-4">
-                  <Link to="/account" className="block text-lg font-bold text-stone-500" onClick={() => setIsMobileMenuOpen(false)}>Account</Link>
-                  {profile?.role === 'seller' && (
-                    <Link to="/seller" className="block text-lg font-bold text-stone-500" onClick={() => setIsMobileMenuOpen(false)}>Seller Hub</Link>
-                  )}
-                  <button onClick={() => { signOut(); setIsMobileMenuOpen(false); }} className="block w-full text-left text-lg font-bold text-rose-600 pt-4">Sign Out</button>
+        <div className="md:hidden fixed inset-0 z-[100] flex">
+          {/* Overlay */}
+          <div 
+            className="fixed inset-0 bg-black/60 transition-opacity" 
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          {/* Side Panel */}
+          <div className="relative flex w-[80%] max-w-sm flex-col overflow-y-auto bg-white shadow-xl animate-in slide-in-from-left duration-300">
+            <div className="flex items-center justify-between px-4 py-6 border-b border-stone-100">
+              <Link to="/" className="flex items-center space-x-2" onClick={() => setIsMobileMenuOpen(false)}>
+                <div className="w-8 h-8 bg-slate-900 rounded-xl flex items-center justify-center">
+                  <span className="text-white font-black text-lg italic leading-none">e</span>
                 </div>
-              ) : (
-                <div className="space-y-4 pt-4">
-                  <Link to="/auth" className="block text-center py-4 bg-slate-900 text-white font-black rounded-2xl" onClick={() => setIsMobileMenuOpen(false)}>Get Started</Link>
-                </div>
-              )
-            ) : null}
+                <span className="text-lg font-black tracking-tighter text-slate-900 leading-none">
+                  eMall
+                </span>
+              </Link>
+              <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-slate-500 hover:text-slate-900 transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="px-4 py-8 flex flex-col flex-1">
+              <div className="space-y-6 flex-1">
+                <Link 
+                  to="/shop" 
+                  className="block text-2xl font-black text-slate-900 tracking-tight"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Marketplace
+                </Link>
+                <hr className="border-stone-100" />
+                {!loading ? (
+                  user ? (
+                    <div className="space-y-4">
+                      <Link to="/account" className="block text-lg font-bold text-stone-500 hover:text-slate-900" onClick={() => setIsMobileMenuOpen(false)}>Account</Link>
+                      {profile?.role === 'seller' && (
+                        <Link to="/seller" className="block text-lg font-bold text-stone-500 hover:text-slate-900" onClick={() => setIsMobileMenuOpen(false)}>Seller Hub</Link>
+                      )}
+                      <button onClick={() => { signOut(); setIsMobileMenuOpen(false); }} className="block w-full text-left text-lg font-bold text-rose-600 pt-4">Sign Out</button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 pt-4">
+                      <Link to="/auth" className="block text-center py-4 bg-slate-900 text-white font-black rounded-2xl" onClick={() => setIsMobileMenuOpen(false)}>Get Started</Link>
+                    </div>
+                  )
+                ) : null}
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -29,6 +29,11 @@ export interface Product {
   price: number
   stock: number
   status: 'pending' | 'approved' | 'hidden'
+  is_on_sale?: boolean
+  sale_price?: number | null
+  sale_starts_at?: string | null
+  sale_ends_at?: string | null
+  sale_label?: string | null
   created_at: string
   category?: Category
   seller_store?: SellerStore

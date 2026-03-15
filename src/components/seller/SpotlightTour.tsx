@@ -39,14 +39,52 @@ type SpotlightRect = {
   height: number
 }
 
+type ViewportState = {
+  width: number
+  height: number
+  offsetTop: number
+  offsetLeft: number
+}
+
 const STORAGE_KEY = 'sellerTourStep'
-const HIGHLIGHT_PADDING = 16
-const PANEL_GAP = 24
-const PANEL_PADDING = 32
+const MOBILE_BREAKPOINT = 640
+const DESKTOP_HIGHLIGHT_PADDING = 16
+const MOBILE_HIGHLIGHT_PADDING = 8
+const DESKTOP_PANEL_GAP = 24
+const MOBILE_PANEL_GAP = 12
+const DESKTOP_PANEL_PADDING = 32
+const MOBILE_PANEL_PADDING = 16
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))
+}
+
+function isMobileViewport(viewport: ViewportState) {
+  return viewport.width < MOBILE_BREAKPOINT
+}
+
+function getHighlightPadding(viewport: ViewportState) {
+  return isMobileViewport(viewport) ? MOBILE_HIGHLIGHT_PADDING : DESKTOP_HIGHLIGHT_PADDING
+}
+
+function getPanelGap(viewport: ViewportState) {
+  return isMobileViewport(viewport) ? MOBILE_PANEL_GAP : DESKTOP_PANEL_GAP
+}
+
+function getPanelPadding(viewport: ViewportState) {
+  return isMobileViewport(viewport) ? MOBILE_PANEL_PADDING : DESKTOP_PANEL_PADDING
+}
+
+function getViewportMetrics(): ViewportState {
+  const visualViewport = window.visualViewport
+
+  return {
+    width: Math.round(visualViewport?.width ?? window.innerWidth),
+    height: Math.round(visualViewport?.height ?? window.innerHeight),
+    offsetTop: Math.round(visualViewport?.offsetTop ?? 0),
+    offsetLeft: Math.round(visualViewport?.offsetLeft ?? 0),
+  }
 }
 
 function getPanelPosition({
@@ -55,17 +93,26 @@ function getPanelPosition({
   panelWidth,
   panelHeight,
   placement,
+  panelGap,
+  panelPadding,
 }: {
   rect: SpotlightRect | null
-  viewport: { width: number; height: number }
+  viewport: ViewportState
   panelWidth: number
   panelHeight: number
   placement: SpotlightStep['panelPlacement']
+  panelGap: number
+  panelPadding: number
 }) {
+  const minTop = viewport.offsetTop + panelPadding
+  const maxTop = viewport.offsetTop + viewport.height - panelHeight - panelPadding
+  const minLeft = viewport.offsetLeft + panelPadding
+  const maxLeft = viewport.offsetLeft + viewport.width - panelWidth - panelPadding
+
   if (!rect) {
     return {
-      top: PANEL_PADDING,
-      left: PANEL_PADDING,
+      top: minTop,
+      left: minLeft,
     }
   }
 
@@ -75,40 +122,40 @@ function getPanelPosition({
 
   for (const candidate of placements) {
     if (candidate === 'bottom') {
-      const top = rect.top + rect.height + PANEL_GAP
-      if (top + panelHeight <= viewport.height - PANEL_PADDING) {
+      const top = rect.top + rect.height + panelGap
+      if (top + panelHeight <= viewport.offsetTop + viewport.height - panelPadding) {
         return {
           top,
-          left: clamp(rect.left + rect.width / 2 - panelWidth / 2, PANEL_PADDING, viewport.width - panelWidth - PANEL_PADDING),
+          left: clamp(rect.left + rect.width / 2 - panelWidth / 2, minLeft, maxLeft),
         }
       }
     }
 
     if (candidate === 'top') {
-      const top = rect.top - panelHeight - PANEL_GAP
-      if (top >= PANEL_PADDING) {
+      const top = rect.top - panelHeight - panelGap
+      if (top >= minTop) {
         return {
           top,
-          left: clamp(rect.left + rect.width / 2 - panelWidth / 2, PANEL_PADDING, viewport.width - panelWidth - PANEL_PADDING),
+          left: clamp(rect.left + rect.width / 2 - panelWidth / 2, minLeft, maxLeft),
         }
       }
     }
 
     if (candidate === 'right') {
-      const left = rect.left + rect.width + PANEL_GAP
-      if (left + panelWidth <= viewport.width - PANEL_PADDING) {
+      const left = rect.left + rect.width + panelGap
+      if (left + panelWidth <= viewport.offsetLeft + viewport.width - panelPadding) {
         return {
-          top: clamp(rect.top + rect.height / 2 - panelHeight / 2, PANEL_PADDING, viewport.height - panelHeight - PANEL_PADDING),
+          top: clamp(rect.top + rect.height / 2 - panelHeight / 2, minTop, maxTop),
           left,
         }
       }
     }
 
     if (candidate === 'left') {
-      const left = rect.left - panelWidth - PANEL_GAP
-      if (left >= PANEL_PADDING) {
+      const left = rect.left - panelWidth - panelGap
+      if (left >= minLeft) {
         return {
-          top: clamp(rect.top + rect.height / 2 - panelHeight / 2, PANEL_PADDING, viewport.height - panelHeight - PANEL_PADDING),
+          top: clamp(rect.top + rect.height / 2 - panelHeight / 2, minTop, maxTop),
           left,
         }
       }
@@ -116,8 +163,8 @@ function getPanelPosition({
   }
 
   return {
-    top: clamp(rect.top + rect.height + PANEL_GAP, PANEL_PADDING, viewport.height - panelHeight - PANEL_PADDING),
-    left: clamp(rect.left + rect.width / 2 - panelWidth / 2, PANEL_PADDING, viewport.width - panelWidth - PANEL_PADDING),
+    top: clamp(rect.top + rect.height + panelGap, minTop, maxTop),
+    left: clamp(rect.left + rect.width / 2 - panelWidth / 2, minLeft, maxLeft),
   }
 }
 
@@ -137,12 +184,18 @@ function getTarget(selector: string) {
   return target
 }
 
-function getSpotlightRect(target: HTMLElement, viewport: { width: number; height: number }): SpotlightRect {
+function getSpotlightRect(target: HTMLElement, viewport: ViewportState): SpotlightRect {
   const bounds = target.getBoundingClientRect()
-  const top = clamp(bounds.top - HIGHLIGHT_PADDING, PANEL_PADDING, Math.max(PANEL_PADDING, viewport.height - PANEL_PADDING))
-  const left = clamp(bounds.left - HIGHLIGHT_PADDING, PANEL_PADDING, Math.max(PANEL_PADDING, viewport.width - PANEL_PADDING))
-  const right = clamp(bounds.right + HIGHLIGHT_PADDING, left + 1, Math.max(left + 1, viewport.width - PANEL_PADDING))
-  const bottom = clamp(bounds.bottom + HIGHLIGHT_PADDING, top + 1, Math.max(top + 1, viewport.height - PANEL_PADDING))
+  const highlightPadding = getHighlightPadding(viewport)
+  const panelPadding = getPanelPadding(viewport)
+  const minTop = viewport.offsetTop + panelPadding
+  const maxTop = viewport.offsetTop + viewport.height - panelPadding
+  const minLeft = viewport.offsetLeft + panelPadding
+  const maxLeft = viewport.offsetLeft + viewport.width - panelPadding
+  const top = clamp(bounds.top + viewport.offsetTop - highlightPadding, minTop, Math.max(minTop, maxTop))
+  const left = clamp(bounds.left + viewport.offsetLeft - highlightPadding, minLeft, Math.max(minLeft, maxLeft))
+  const right = clamp(bounds.right + viewport.offsetLeft + highlightPadding, left + 1, Math.max(left + 1, maxLeft))
+  const bottom = clamp(bounds.bottom + viewport.offsetTop + highlightPadding, top + 1, Math.max(top + 1, maxTop))
 
   return {
     top,
@@ -150,6 +203,23 @@ function getSpotlightRect(target: HTMLElement, viewport: { width: number; height
     width: right - left,
     height: bottom - top,
   }
+}
+
+async function revealTarget(target: HTMLElement, viewport: ViewportState) {
+  if (isMobileViewport(viewport)) {
+    const bounds = target.getBoundingClientRect()
+    const desiredCenter = viewport.height * 0.32
+    const delta = bounds.top + bounds.height / 2 - desiredCenter
+
+    if (Math.abs(delta) > 12) {
+      window.scrollBy({ top: delta, behavior: 'smooth' })
+      await wait(280)
+      return
+    }
+  }
+
+  target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+  await wait(250)
 }
 
 function isTypingElement(element: EventTarget | null) {
@@ -179,7 +249,7 @@ export default function SpotlightTour({
   const [notFound, setNotFound] = useState(false)
   const [pendingIndex, setPendingIndex] = useState<number | null>(null)
   const [isAdvancing, setIsAdvancing] = useState(false)
-  const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight })
+  const [viewport, setViewport] = useState<ViewportState>(() => getViewportMetrics())
   const [panelHeight, setPanelHeight] = useState(320)
   const panelRef = useRef<HTMLDivElement | null>(null)
 
@@ -253,8 +323,7 @@ export default function SpotlightTour({
 
     const target = await waitForElement(step.selector)
     if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
-      await wait(250)
+      await revealTarget(target, viewport)
       setRect(getSpotlightRect(target, viewport))
       setNotFound(false)
       return target
@@ -315,21 +384,26 @@ export default function SpotlightTour({
     }
 
     const handleViewport = () => {
-      const nextViewport = { width: window.innerWidth, height: window.innerHeight }
+      const nextViewport = getViewportMetrics()
       setViewport(nextViewport)
       syncPosition(nextViewport)
     }
 
     const handleScroll = () => syncPosition()
+    const visualViewport = window.visualViewport
 
     window.addEventListener('resize', handleViewport)
     window.addEventListener('scroll', handleScroll, true)
+    visualViewport?.addEventListener('resize', handleViewport)
+    visualViewport?.addEventListener('scroll', handleViewport)
 
     return () => {
       window.removeEventListener('resize', handleViewport)
       window.removeEventListener('scroll', handleScroll, true)
+      visualViewport?.removeEventListener('resize', handleViewport)
+      visualViewport?.removeEventListener('scroll', handleViewport)
     }
-  }, [currentStep, isOpen, notFound, viewport.height, viewport.width])
+  }, [currentStep, isOpen, notFound, viewport])
 
   useEffect(() => {
     if (!isOpen || !currentStep || notFound || isAdvancing || !currentStep.advanceOn) {
@@ -499,23 +573,40 @@ export default function SpotlightTour({
     return null
   }
 
-  const panelWidth = Math.min(380, viewport.width - PANEL_PADDING * 2)
-  const panelMaxHeight = Math.max(260, viewport.height - PANEL_PADDING * 2)
+  const isMobile = isMobileViewport(viewport)
+  const panelPadding = getPanelPadding(viewport)
+  const panelGap = getPanelGap(viewport)
+  const panelWidth = isMobile ? viewport.width - panelPadding * 2 : Math.min(380, viewport.width - panelPadding * 2)
+  const panelMaxHeight = Math.max(isMobile ? 240 : 260, viewport.height - panelPadding * 2)
   const resolvedPanelHeight = Math.min(panelHeight, panelMaxHeight)
-  const top = rect?.top ?? PANEL_PADDING
-  const left = rect?.left ?? PANEL_PADDING
-  const width = rect?.width ?? viewport.width - PANEL_PADDING * 2
-  const height = rect?.height ?? viewport.height - PANEL_PADDING * 2
-  const { top: panelTop, left: panelLeft } = getPanelPosition({
+  const mobilePanelHeight = Math.min(Math.max(280, Math.round(viewport.height * 0.42)), panelMaxHeight)
+  const top = rect?.top ?? viewport.offsetTop + panelPadding
+  const left = rect?.left ?? viewport.offsetLeft + panelPadding
+  const width = rect?.width ?? viewport.width - panelPadding * 2
+  const height = rect?.height ?? viewport.height - panelPadding * 2
+  const floatingPanelPosition = getPanelPosition({
     rect,
     viewport,
     panelWidth,
     panelHeight: resolvedPanelHeight,
     placement: currentStep.panelPlacement,
+    panelGap,
+    panelPadding,
   })
-
-  // Ensure the panel does not extend beyond the viewport bottom
-  const safeMaxHeight = Math.min(panelMaxHeight, viewport.height - panelTop - PANEL_PADDING)
+  const panelTop = isMobile
+    ? viewport.offsetTop + viewport.height - mobilePanelHeight - panelPadding
+    : floatingPanelPosition.top
+  const panelLeft = isMobile ? viewport.offsetLeft + panelPadding : floatingPanelPosition.left
+  const safeMaxHeight = isMobile
+    ? mobilePanelHeight
+    : Math.min(panelMaxHeight, viewport.offsetTop + viewport.height - panelTop - panelPadding)
+  const overlayClassName = isMobile ? 'fixed bg-slate-950/58' : 'fixed bg-slate-950/70 backdrop-blur-[2px]'
+  const spotlightClassName = isMobile
+    ? 'fixed rounded-[1.25rem] border border-white/70 bg-transparent shadow-[0_0_0_1px_rgba(255,255,255,0.22),0_18px_48px_rgba(15,23,42,0.24)] transition-all duration-300'
+    : 'fixed rounded-[2rem] border border-white/80 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.35),0_24px_80px_rgba(15,23,42,0.35)] transition-all duration-300'
+  const panelShellClassName = isMobile
+    ? 'fixed rounded-[2rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.98))] shadow-[0_-18px_50px_rgba(15,23,42,0.18)] flex flex-col'
+    : 'fixed rounded-[2rem] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] shadow-[0_24px_80px_rgba(15,23,42,0.28)] flex flex-col'
 
   const autoHint =
     currentStep.advanceOn?.type === 'click'
@@ -558,29 +649,29 @@ export default function SpotlightTour({
     <div className="fixed inset-0 z-[999] pointer-events-none">
       {rect && !notFound && (
         <>
-          <div className="fixed bg-slate-950/70 backdrop-blur-[2px]" style={{ top: 0, left: 0, width: viewport.width, height: top, pointerEvents: 'auto', zIndex: 9999 }} />
-          <div className="fixed bg-slate-950/70 backdrop-blur-[2px]" style={{ top, left: 0, width: left, height, pointerEvents: 'auto', zIndex: 9999 }} />
-          <div className="fixed bg-slate-950/70 backdrop-blur-[2px]" style={{ top, left: left + width, width: viewport.width - (left + width), height, pointerEvents: 'auto', zIndex: 9999 }} />
-          <div className="fixed bg-slate-950/70 backdrop-blur-[2px]" style={{ top: top + height, left: 0, width: viewport.width, height: viewport.height - (top + height), pointerEvents: 'auto', zIndex: 9999 }} />
+          <div className={overlayClassName} style={{ top: viewport.offsetTop, left: viewport.offsetLeft, width: viewport.width, height: Math.max(0, top - viewport.offsetTop), pointerEvents: 'auto', zIndex: 9999 }} />
+          <div className={overlayClassName} style={{ top, left: viewport.offsetLeft, width: Math.max(0, left - viewport.offsetLeft), height, pointerEvents: 'auto', zIndex: 9999 }} />
+          <div className={overlayClassName} style={{ top, left: left + width, width: Math.max(0, viewport.offsetLeft + viewport.width - (left + width)), height, pointerEvents: 'auto', zIndex: 9999 }} />
+          <div className={overlayClassName} style={{ top: top + height, left: viewport.offsetLeft, width: viewport.width, height: Math.max(0, viewport.offsetTop + viewport.height - (top + height)), pointerEvents: 'auto', zIndex: 9999 }} />
           <div
-            className="fixed rounded-[2rem] border border-white/80 bg-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.35),0_24px_80px_rgba(15,23,42,0.35)] transition-all duration-300"
+            className={spotlightClassName}
             style={{ top, left, width, height, zIndex: 10000, pointerEvents: 'none' }}
           >
-            <div className="absolute inset-0 rounded-[2rem] border-4 border-white/15" />
-            <div className="absolute inset-0 rounded-[2rem] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]" />
+            <div className={`absolute inset-0 ${isMobile ? 'rounded-[1.25rem] border-2' : 'rounded-[2rem] border-4'} border-white/15`} />
+            <div className={`absolute inset-0 ${isMobile ? 'rounded-[1.25rem]' : 'rounded-[2rem]'} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]`} />
           </div>
         </>
       )}
 
-      {!rect && !notFound && <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-[2px]" style={{ zIndex: 9998, pointerEvents: 'auto' }} />}
-      {notFound && <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-[2px]" style={{ zIndex: 9998, pointerEvents: 'auto' }} />}
+      {!rect && !notFound && <div className={`${overlayClassName} inset-0`} style={{ zIndex: 9998, pointerEvents: 'auto' }} />}
+      {notFound && <div className={`${overlayClassName} inset-0`} style={{ zIndex: 9998, pointerEvents: 'auto' }} />}
 
       <div
         ref={panelRef}
-        className="fixed rounded-[2rem] border border-white/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] shadow-[0_24px_80px_rgba(15,23,42,0.28)] flex flex-col"
+        className={panelShellClassName}
         style={{ top: panelTop, left: panelLeft, width: panelWidth, maxHeight: safeMaxHeight, zIndex: 10001, pointerEvents: 'auto' }}
       >
-        <div className="rounded-[2rem] border border-white/80 bg-white/80 p-5 backdrop-blur-xl sm:p-6" style={{ maxHeight: safeMaxHeight, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+        <div className={isMobile ? 'rounded-[2rem] border border-white/80 bg-white/92 p-4 sm:p-5' : 'rounded-[2rem] border border-white/80 bg-white/80 p-5 backdrop-blur-xl sm:p-6'} style={{ maxHeight: safeMaxHeight, overflowY: 'auto', overscrollBehavior: 'contain', paddingBottom: isMobile ? 'calc(1rem + env(safe-area-inset-bottom, 0px))' : undefined }}>
           {notFound ? (
             renderMissingState
           ) : (
