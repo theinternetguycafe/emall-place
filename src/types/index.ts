@@ -47,6 +47,24 @@ export interface SellerStore {
   description: string | null
   status: 'pending' | 'active' | 'suspended'
   created_at: string
+  logo_url?: string | null
+  tagline?: string | null
+  average_rating?: number | null
+  review_count?: number | null
+  seller_location?: string | null
+  seller_email?: string | null
+  seller_phone?: string | null
+  announcement_text?: string | null
+  theme_color?: string | null
+  store_policies?: StorePolicies | null
+  featured_product_ids?: string[] | null
+  banner_url?: string | null
+}
+
+export interface StorePolicies {
+  shipping?: string | null
+  returns?: string | null
+  warranty?: string | null
 }
 
 export interface ProductImage {

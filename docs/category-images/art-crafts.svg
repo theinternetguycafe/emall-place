@@ -1,0 +1,20 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="artGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6D28D9;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" fill="url(#artGrad)"/>
+  <!-- Palette -->
+  <ellipse cx="100" cy="100" rx="45" ry="40" fill="white"/>
+  <!-- Paint spots -->
+  <circle cx="75" cy="80" r="6" fill="#EF4444"/>
+  <circle cx="125" cy="80" r="6" fill="#FBBF24"/>
+  <circle cx="70" cy="110" r="6" fill="#3B82F6"/>
+  <circle cx="130" cy="110" r="6" fill="#10B981"/>
+  <circle cx="100" cy="130" r="6" fill="#8B5CF6"/>
+  <!-- Brush -->
+  <rect x="145" y="50" width="8" height="50" fill="#92400E" rx="2"/>
+  <ellipse cx="149" cy="48" rx="5" ry="6" fill="#D2B48C"/>
+</svg>
