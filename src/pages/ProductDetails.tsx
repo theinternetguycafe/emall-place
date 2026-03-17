@@ -170,7 +170,7 @@ export default function ProductDetails() {
               onClick={() => {
                 const storeId = (product as any).seller_store?.id
                 if (storeId) {
-                  navigate(`/shop?store=${storeId}`)
+                  navigate(`/store/${storeId}`)
                 }
               }}
               className="inline-flex items-center gap-2 bg-stone-100 px-4 py-2 rounded-full text-stone-600 hover:bg-stone-200 hover:text-slate-900 transition-colors mb-6 group"
