@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Product, SellerStore } from '../types'
-import { ChevronRight, Store as StoreIcon, Package, AlertCircle } from 'lucide-react'
+import { ChevronRight, Store as StoreIcon, Package, AlertCircle, Edit2, Loader } from 'lucide-react'
 import ProductImage from '../components/ProductImage'
 import ErrorAlert from '../components/ErrorAlert'
 import { Button } from '../components/ui/Button'
@@ -10,13 +10,21 @@ import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Helmet } from 'react-helmet-async'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function StoreHome() {
   const { storeId } = useParams<{ storeId: string }>()
+  const { user } = useAuth()
   const [store, setStore] = useState<SellerStore | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [uploadingBanner, setUploadingBanner] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+
+  const isOwner = user && store && user.id === store.owner_id
+  const bannerInputRef = useRef<HTMLInputElement>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (storeId) {
@@ -56,6 +64,84 @@ export default function StoreHome() {
       setError('Failed to load store. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleBannerUpload = async (file: File) => {
+    if (!store || !isOwner) return
+    
+    setUploadingBanner(true)
+    try {
+      const fileName = `banner-${storeId}-${Date.now()}`
+      const { data, error: uploadError } = await supabase.storage
+        .from('store-images')
+        .upload(fileName, file, { upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage
+        .from('store-images')
+        .getPublicUrl(fileName)
+
+      const { error: updateError } = await supabase
+        .from('seller_stores')
+        .update({ banner_url: urlData.publicUrl })
+        .eq('id', storeId!)
+
+      if (updateError) throw updateError
+
+      setStore({ ...store, banner_url: urlData.publicUrl })
+    } catch (err: any) {
+      console.error('Error uploading banner:', err)
+      setError('Failed to upload banner image')
+    } finally {
+      setUploadingBanner(false)
+    }
+  }
+
+  const handleLogoUpload = async (file: File) => {
+    if (!store || !isOwner) return
+    
+    setUploadingLogo(true)
+    try {
+      const fileName = `logo-${storeId}-${Date.now()}`
+      const { data, error: uploadError } = await supabase.storage
+        .from('store-images')
+        .upload(fileName, file, { upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage
+        .from('store-images')
+        .getPublicUrl(fileName)
+
+      const { error: updateError } = await supabase
+        .from('seller_stores')
+        .update({ logo_url: urlData.publicUrl })
+        .eq('id', storeId!)
+
+      if (updateError) throw updateError
+
+      setStore({ ...store, logo_url: urlData.publicUrl })
+    } catch (err: any) {
+      console.error('Error uploading logo:', err)
+      setError('Failed to upload logo image')
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
+  const handleBannerFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleBannerUpload(file)
+    }
+  }
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleLogoUpload(file)
     }
   }
 
@@ -112,16 +198,54 @@ export default function StoreHome() {
           {/* Store Info Card */}
           <div className="relative mb-16 rounded-[2rem] overflow-hidden bg-white shadow-[0_32px_64px_-12px_rgba(0,0,0,0.1)] border border-stone-100">
             {/* Banner Background */}
-            <div className="h-48 bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-500 w-full relative">
-              <div className="absolute inset-0 bg-black/10 mix-blend-overlay"></div>
+            <div className="h-48 bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-500 w-full relative group cursor-pointer" 
+                 onClick={() => isOwner && bannerInputRef.current?.click()}>
+              <div className="absolute inset-0 bg-black/10 mix-blend-overlay group-hover:bg-black/20 transition-colors" />
+              
+              {isOwner && (
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="bg-black/50 text-white rounded-full p-3 backdrop-blur">
+                    <Edit2 className="h-6 w-6" />
+                  </div>
+                </div>
+              )}
+              
+              {uploadingBanner && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <Loader className="h-8 w-8 text-white animate-spin" />
+                </div>
+              )}
             </div>
             
             <div className="px-8 pb-10 relative">
               <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6 -mt-16 mb-6">
-                <div className="flex-shrink-0 w-32 h-32 bg-white rounded-[2rem] p-2 shadow-xl border border-stone-100 relative z-10">
-                  <div className="w-full h-full bg-slate-900 rounded-2xl flex items-center justify-center">
-                    <StoreIcon className="h-12 w-12 text-white" />
-                  </div>
+                <div className="flex-shrink-0 w-32 h-32 bg-white rounded-[2rem] p-2 shadow-xl border border-stone-100 relative z-10 group cursor-pointer"
+                     onClick={() => isOwner && logoInputRef.current?.click()}>
+                  {store.logo_url ? (
+                    <img
+                      src={store.logo_url}
+                      alt={store.store_name}
+                      className="w-full h-full object-cover rounded-2xl group-hover:opacity-75 transition-opacity"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-slate-900 rounded-2xl flex items-center justify-center group-hover:opacity-75 transition-opacity">
+                      <StoreIcon className="h-12 w-12 text-white" />
+                    </div>
+                  )}
+                  
+                  {isOwner && (
+                    <div className="absolute inset-2 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="bg-black/50 text-white rounded-full p-2 backdrop-blur">
+                        <Edit2 className="h-4 w-4" />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {uploadingLogo && (
+                    <div className="absolute inset-2 flex items-center justify-center bg-black/40 rounded-2xl">
+                      <Loader className="h-6 w-6 text-white animate-spin" />
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex-1 pb-2">
@@ -227,6 +351,22 @@ export default function StoreHome() {
             ))}
           </div>
         )}
+
+        {/* Hidden file inputs for image uploads */}
+        <input
+          ref={bannerInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleBannerFileChange}
+          className="hidden"
+        />
+        <input
+          ref={logoInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleLogoFileChange}
+          className="hidden"
+        />
       </div>
     </div>
     </>
