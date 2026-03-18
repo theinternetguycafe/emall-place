@@ -1,18 +1,19 @@
 import React, { useRef } from 'react'
 import { Category } from '../../types'
-import { ChevronLeft, ChevronRight, Tag } from 'lucide-react'
-import { Button } from '../ui/Button'
-import { Card } from '../ui/Card'
+import { ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react'
+import { getPlaceholderImage } from '../../lib/categories'
 
 interface CategoryCarouselProps {
   categories: Category[]
+  categoryThumbnails: Record<string, string>
   selectedCategoryId?: string
-  onCategorySelect?: (category: Category) => void
+  onCategorySelect?: (categoryId: string) => void
   isLoading?: boolean
 }
 
 export default function CategoryCarousel({
   categories,
+  categoryThumbnails,
   selectedCategoryId = 'all',
   onCategorySelect,
   isLoading,
@@ -21,8 +22,9 @@ export default function CategoryCarousel({
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
+      const scrollAmount = 240
       scrollContainerRef.current.scrollBy({
-        left: direction === 'left' ? -300 : 300,
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth',
       })
     }
@@ -36,7 +38,7 @@ export default function CategoryCarousel({
         </h2>
         <div className="flex gap-4">
           {[1, 2, 3, 4, 5].map(index => (
-            <div key={index} className="h-32 w-40 flex-shrink-0 animate-pulse rounded-xl bg-stone-100" />
+            <div key={index} className="h-24 w-20 flex-shrink-0 animate-pulse rounded-lg bg-stone-100" />
           ))}
         </div>
       </div>
@@ -49,81 +51,67 @@ export default function CategoryCarousel({
 
   return (
     <section className="py-12">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="mb-2 flex items-center gap-3 text-2xl font-black uppercase tracking-tight text-slate-900 sm:text-3xl">
-            <Tag className="h-6 w-6" />
-            Shop by Category
-          </h2>
-          <p className="text-stone-600">Browse this store&apos;s collections</p>
-        </div>
-
-        <div className="hidden gap-2 sm:flex">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => scroll('left')}
-            className="rounded-full p-2"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => scroll('right')}
-            className="rounded-full p-2"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="relative">
-        <div
-          ref={scrollContainerRef}
-          className="flex gap-4 overflow-x-auto pb-4 scroll-smooth scrollbar-hide"
+      <div className="relative group">
+        {/* Left Arrow */}
+        <button
+          onClick={() => scroll('left')}
+          className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white border border-slate-200 rounded-full items-center justify-center hover:bg-slate-50 transition-all shadow-md"
+          aria-label="Scroll categories left"
         >
-          {categories.map(category => {
-            const isSelected = selectedCategoryId === category.id
+          <ChevronLeft className="h-5 w-5 text-slate-600" />
+        </button>
 
+        {/* Categories Scroll Container */}
+        <div ref={scrollContainerRef} className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide px-12">
+          <button
+            onClick={() => onCategorySelect?.('all')}
+            className={`flex-shrink-0 flex flex-col items-center gap-2 p-3 rounded-lg transition-all border-2 ${
+              selectedCategoryId === 'all' 
+                ? 'border-slate-900 bg-slate-50' 
+                : 'border-slate-200 hover:border-slate-400 bg-white'
+            }`}
+          >
+            <div className="w-20 h-20 bg-gradient-to-br from-slate-900 to-slate-700 rounded-md flex items-center justify-center text-white text-lg flex-shrink-0">
+              <LayoutGrid size={28} />
+            </div>
+            <span className="text-xs font-bold whitespace-normal text-center line-clamp-2 max-w-[80px]">All</span>
+          </button>
+
+          {categories.map(cat => {
+            const thumbUrl = categoryThumbnails[cat.id] || getPlaceholderImage()
             return (
               <button
-                key={category.id}
-                type="button"
-                onClick={() => onCategorySelect?.(category)}
-                className="flex-shrink-0 focus:outline-none"
+                key={cat.id}
+                onClick={() => onCategorySelect?.(cat.id)}
+                className={`flex-shrink-0 flex flex-col items-center gap-2 p-3 rounded-lg transition-all border-2 ${
+                  selectedCategoryId === cat.id 
+                    ? 'border-slate-900 bg-slate-50' 
+                    : 'border-slate-200 hover:border-slate-400 bg-white'
+                }`}
+                title={cat.name}
               >
-                <Card
-                  className={`h-32 w-40 cursor-pointer overflow-hidden transition-all duration-300 group ${
-                    isSelected
-                      ? 'border-slate-900 shadow-lg shadow-slate-200'
-                      : 'hover:shadow-lg'
-                  }`}
-                >
-                  <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-stone-100 to-stone-200">
-                    {category.image_url ? (
-                      <img
-                        src={category.image_url}
-                        alt={category.name}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <Tag className="h-8 w-8 text-stone-400" />
-                    )}
-                    <div
-                      className={`absolute inset-0 flex items-center justify-center px-3 text-center text-sm font-bold text-white transition-colors ${
-                        isSelected ? 'bg-slate-900/55' : 'bg-black/25 group-hover:bg-black/40'
-                      }`}
-                    >
-                      {category.name}
-                    </div>
-                  </div>
-                </Card>
+                <img
+                  src={thumbUrl}
+                  alt={cat.name}
+                  className="w-20 h-20 rounded-md object-cover flex-shrink-0"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = getPlaceholderImage()
+                  }}
+                />
+                <span className="text-xs font-bold text-center line-clamp-2 max-w-[80px]">{cat.name}</span>
               </button>
             )
           })}
         </div>
+
+        {/* Right Arrow */}
+        <button
+          onClick={() => scroll('right')}
+          className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white border border-slate-200 rounded-full items-center justify-center hover:bg-slate-50 transition-all shadow-md"
+          aria-label="Scroll categories right"
+        >
+          <ChevronRight className="h-5 w-5 text-slate-600" />
+        </button>
       </div>
     </section>
   )
