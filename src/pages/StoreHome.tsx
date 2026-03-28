@@ -72,15 +72,20 @@ export default function StoreHome() {
     
     setUploadingBanner(true)
     try {
-      const fileName = `banner-${storeId}-${Date.now()}`
+      const fileName = `${storeId}/${Date.now()}`
       const { data, error: uploadError } = await supabase.storage
-        .from('store-images')
+        .from('store-banners')
         .upload(fileName, file, { upsert: true })
-
-      if (uploadError) throw uploadError
-
+        
+      if (uploadError) {
+        if (uploadError.message?.includes('bucket not found')) {
+          throw new Error('Storage bucket "store-banners" not found. Please run the initialize_storage_buckets.sql script in your Supabase SQL Editor.')
+        }
+        throw uploadError
+      }
+      
       const { data: urlData } = supabase.storage
-        .from('store-images')
+        .from('store-banners')
         .getPublicUrl(fileName)
 
       const { error: updateError } = await supabase
@@ -104,17 +109,21 @@ export default function StoreHome() {
     
     setUploadingLogo(true)
     try {
-      const fileName = `logo-${storeId}-${Date.now()}`
+      const fileName = `${storeId}/${Date.now()}`
       const { data, error: uploadError } = await supabase.storage
-        .from('store-images')
+        .from('store-logos')
         .upload(fileName, file, { upsert: true })
-
-      if (uploadError) throw uploadError
-
+        
+      if (uploadError) {
+        if (uploadError.message?.includes('bucket not found')) {
+           throw new Error('Storage bucket "store-logos" not found. Please run the initialize_storage_buckets.sql script in your Supabase SQL Editor.')
+        }
+        throw uploadError
+      }
+      
       const { data: urlData } = supabase.storage
-        .from('store-images')
+        .from('store-logos')
         .getPublicUrl(fileName)
-
       const { error: updateError } = await supabase
         .from('seller_stores')
         .update({ logo_url: urlData.publicUrl })
@@ -181,7 +190,7 @@ export default function StoreHome() {
     <>
       <Helmet>
         <title>{store.store_name} | eMall Place</title>
-        <meta name="description" content={store.description?.slice(0, 160) || `Shop from ${store.store_name} on eMall Place Collective.`} />
+        <meta name="description" content={store.description?.slice(0, 160) || `${store.seller_type === 'service' ? 'Book' : 'Shop'} from ${store.store_name} on eMall Place Collective.`} />
       </Helmet>
       <div className="bg-[#F9F8F6] min-h-screen">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
@@ -269,7 +278,7 @@ export default function StoreHome() {
                 <div className="flex items-center gap-4 flex-wrap">
                   <Badge variant="outline" className="py-2 px-4 rounded-full font-bold">
                     <Package className="h-4 w-4 mr-2 inline" />
-                    {products.length} Products Available
+                    {products.length} {store.seller_type === 'service' ? 'Services' : 'Products'} Available
                   </Badge>
                   <Badge variant="outline" className="py-2 px-4 rounded-full font-bold">
                     Joined {new Date(store.created_at).toLocaleDateString()}
@@ -282,9 +291,9 @@ export default function StoreHome() {
           {/* Section Title */}
           <div className="mb-8">
             <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight">
-              Shop All Products
+              {store.seller_type === 'service' ? 'Explore Services' : 'Shop All Products'}
             </h2>
-            <p className="text-slate-500 mt-2">Explore our full collection</p>
+            <p className="text-slate-500 mt-2">{store.seller_type === 'service' ? 'Professional services you can book today' : 'Explore our full collection'}</p>
           </div>
         </div>
 
@@ -294,8 +303,8 @@ export default function StoreHome() {
             <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
               <Package className="h-8 w-8 text-slate-300" />
             </div>
-            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">No Products Yet</h3>
-            <p className="text-slate-500 mt-2">This store doesn't have any products yet.</p>
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">No {store.seller_type === 'service' ? 'Services' : 'Products'} Yet</h3>
+            <p className="text-slate-500 mt-2">This {store.seller_type === 'service' ? 'service shop' : 'store'} doesn't have any {store.seller_type === 'service' ? 'services' : 'products'} yet.</p>
             <Button variant="outline" className="mt-8" onClick={() => window.history.back()}>
               Go Back
             </Button>

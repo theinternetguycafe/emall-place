@@ -12,6 +12,7 @@ import ErrorAlert from '../components/ErrorAlert'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
+import AuthModal from '../components/auth/AuthModal'
 
 const mapPaymentError = (err: any): string => {
   const msg = typeof err === 'string' ? err : (err?.message || err?.error || String(err))
@@ -73,6 +74,14 @@ export default function Checkout() {
   const [showSnapScanQR, setShowSnapScanQR] = useState(false)
   const [returningFromPayment, setReturningFromPayment] = useState(false)
   const [paymentStatus, setPaymentStatus] = useState<'processing' | 'success' | 'failed' | null>(null)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      setShowAuthModal(true)
+    }
+  }, [user, authLoading])
 
   const handleCheckoutFailure = async (orderId: string, reason: string) => {
     try {
@@ -93,6 +102,11 @@ export default function Checkout() {
   const handleCheckout = async (e: React.FormEvent) => {
     if (e) e.preventDefault()
     
+    if (!user) {
+      setShowAuthModal(true)
+      return
+    }
+
     // 1) Block duplicate checkout + ensure valid state
     if (loading || polling || authLoading) return
     
@@ -340,10 +354,22 @@ export default function Checkout() {
     )
   }
 
-  // Redirect to auth if not logged in
-  if (!user) {
-    navigate('/auth')
-    return null
+  // Show AuthModal if user is not logged in but they are trying to checkout
+  if (!user && !authLoading) {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-5xl min-h-[50vh] flex flex-col items-center justify-center">
+        <h2 className="text-2xl font-black text-slate-900 mb-4">Account Required</h2>
+        <p className="text-stone-500 mb-8 text-center max-w-md">Please sign in or create an account to complete your checkout and secure your order.</p>
+        <Button onClick={() => setShowAuthModal(true)} className="bg-slate-900 text-white hover:bg-slate-800 px-8 py-3 rounded-full font-bold">
+          Sign In / Register
+        </Button>
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+          onSuccess={() => setShowAuthModal(false)}
+        />
+      </div>
+    )
   }
 
   // Show payment processing screen when returning from payment

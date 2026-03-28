@@ -9,18 +9,20 @@ interface SellerProductsTableProps {
   filteredProducts: Product[]
   searchQuery: string
   deleteProduct: (id: string) => Promise<void>
+  sellerType?: 'product' | 'service' | 'both'
 }
 
 export function SellerProductsTable({
   filteredProducts,
   searchQuery,
-  deleteProduct
+  deleteProduct,
+  sellerType
 }: SellerProductsTableProps) {
   return (
     <table className="w-full min-w-[800px] text-left">
       <thead>
         <tr className="bg-stone-50/50">
-          <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Product Details</th>
+          <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">{sellerType === 'service' ? 'Service Details' : 'Product Details'}</th>
           <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Price</th>
           <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Stock</th>
           <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Status</th>
@@ -63,7 +65,7 @@ export function SellerProductsTable({
             </td>
             <td className="px-8 py-6 text-right">
               <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Link to={`/seller/products/${product.id}/edit`} className="inline-flex">
+                <Link to={sellerType === 'service' ? `/seller/services/${product.id}/edit` : `/seller/products/${product.id}/edit`} className="inline-flex">
                   <span className="inline-flex items-center justify-center h-10 w-10 p-0 rounded-xl text-stone-400 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer">
                     <Edit2 className="h-4 w-4" />
                   </span>
@@ -90,17 +92,17 @@ export function SellerProductsTable({
                     <div className="h-20 w-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
                       <Package className="h-10 w-10 text-slate-400" />
                     </div>
-                    <h3 className="text-xl font-black text-slate-900 mb-2">No Products Yet</h3>
+                    <h3 className="text-xl font-black text-slate-900 mb-2">No {sellerType === 'service' ? 'Services' : 'Products'} Yet</h3>
                     <p className="text-stone-500 text-sm mb-8">
-                      Your inventory is currently empty. Start adding your unique products to showcase them in the marketplace.
+                      Your {sellerType === 'service' ? 'service catalog' : 'inventory'} is currently empty. Start adding your unique {sellerType === 'service' ? 'professional services' : 'products'} to showcase them in the marketplace.
                     </p>
-                    <Link to="/seller/products/new">
+                    <Link to={sellerType === 'service' ? "/seller/services/new" : "/seller/products/new"}>
                       <Button className="rounded-full shadow-lg">
-                        Add Your First Product
+                        Add Your First {sellerType === 'service' ? 'Service' : 'Product'}
                       </Button>
                     </Link>
-                 </div>
-               )}
+                  </div>
+                )}
             </td>
           </tr>
         )}

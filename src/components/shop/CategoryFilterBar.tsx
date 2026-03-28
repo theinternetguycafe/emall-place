@@ -30,58 +30,64 @@ export function CategoryFilterBar({
   }
 
   return (
-    <div className="mb-12">
-      <div className="flex items-center gap-2 mb-4">
-        <Filter className="h-5 w-5 text-slate-900" />
-        <h3 className="font-black uppercase tracking-tight text-slate-900">Filter by Category</h3>
+    <div className="mb-20 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+      <div className="flex items-center gap-4 mb-10 overflow-hidden">
+        <div className="flex items-center gap-3">
+          <Filter className="h-4 w-4 text-slate-900" />
+          <h3 className="text-xs font-black uppercase tracking-[0.3em] text-slate-900">Archive Categories</h3>
+        </div>
+        <div className="h-px flex-1 bg-stone-100" />
       </div>
       
       <div className="relative group">
         <button
           onClick={() => scrollCategories('left')}
-          className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white border border-slate-200 rounded-full items-center justify-center hover:bg-slate-50 transition-all shadow-md"
+          className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/90 backdrop-blur-md border border-stone-100 rounded-full items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-xl shadow-stone-200/50 group-hover:scale-110"
           aria-label="Scroll categories left"
         >
-          <ChevronLeft className="h-5 w-5 text-slate-600" />
+          <ChevronLeft className="h-5 w-5" />
         </button>
 
-        <div ref={categoryScrollRef} className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide px-12">
+        <div ref={categoryScrollRef} className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide px-4">
           <button
             onClick={() => onSelectCategory('all')}
-            className={`flex-shrink-0 flex flex-col items-center gap-2 p-3 rounded-lg transition-all border-2 ${
+            className={`flex-shrink-0 flex items-center gap-4 p-2 pr-6 rounded-full transition-all duration-500 border-2 ${
               selectedCategory === 'all' 
-                ? 'border-slate-900 bg-slate-50' 
-                : 'border-slate-200 hover:border-slate-400 bg-white'
+                ? 'border-slate-900 bg-white shadow-xl shadow-stone-200' 
+                : 'border-transparent bg-white hover:border-stone-200 shadow-sm'
             }`}
           >
-            <div className="w-20 h-20 bg-gradient-to-br from-slate-900 to-slate-700 rounded-md flex items-center justify-center text-white text-lg flex-shrink-0">
-              <LayoutGrid size={28} />
+            <div className="w-14 h-14 bg-gradient-to-br from-slate-900 to-slate-700 rounded-full flex items-center justify-center text-white flex-shrink-0 shadow-lg shadow-slate-200">
+              <LayoutGrid size={20} />
             </div>
-            <span className="text-xs font-bold whitespace-normal text-center line-clamp-2 max-w-[80px]">All</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">Everything</span>
           </button>
 
           {categories.map(cat => {
             const thumbUrl = categoryThumbnails[cat.id] || getPlaceholderImage()
+            const isActive = selectedCategory === cat.id
             return (
               <button
                 key={cat.id}
                 onClick={() => onSelectCategory(cat.id)}
-                className={`flex-shrink-0 flex flex-col items-center gap-2 p-3 rounded-lg transition-all border-2 ${
-                  selectedCategory === cat.id 
-                    ? 'border-slate-900 bg-slate-50' 
-                    : 'border-slate-200 hover:border-slate-400 bg-white'
+                className={`flex-shrink-0 flex items-center gap-4 p-2 pr-6 rounded-full transition-all duration-500 border-2 ${
+                  isActive 
+                    ? 'border-slate-900 bg-white shadow-xl shadow-stone-200' 
+                    : 'border-transparent bg-white hover:border-stone-200 shadow-sm'
                 }`}
                 title={cat.name}
               >
-                <img
-                  src={thumbUrl}
-                  alt={cat.name}
-                  className="w-20 h-20 rounded-md object-cover flex-shrink-0"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = getPlaceholderImage()
-                  }}
-                />
-                <span className="text-xs font-bold text-center line-clamp-2 max-w-[80px]">{cat.name}</span>
+                <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 border border-stone-100 shadow-inner">
+                  <img
+                    src={thumbUrl}
+                    alt={cat.name}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = getPlaceholderImage()
+                    }}
+                  />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">{cat.name}</span>
               </button>
             )
           })}
@@ -89,10 +95,10 @@ export function CategoryFilterBar({
 
         <button
           onClick={() => scrollCategories('right')}
-          className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-white border border-slate-200 rounded-full items-center justify-center hover:bg-slate-50 transition-all shadow-md"
+          className="hidden md:flex absolute -right-5 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/90 backdrop-blur-md border border-stone-100 rounded-full items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-xl shadow-stone-200/50 group-hover:scale-110"
           aria-label="Scroll categories right"
         >
-          <ChevronRight className="h-5 w-5 text-slate-600" />
+          <ChevronRight className="h-5 w-5" />
         </button>
       </div>
     </div>

@@ -1,12 +1,14 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { Product } from '../../types'
-import { LayoutGrid, Package, Search } from 'lucide-react'
+import { LayoutGrid, Package, Search, Plus } from 'lucide-react'
 import ProductImage from '../ProductImage'
 import { Card } from '../ui/Card'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Skeleton } from '../ui/Skeleton'
+
+import { useNavigate } from 'react-router-dom'
 
 interface ProductGridProps {
   products: Product[]
@@ -25,12 +27,13 @@ export function ProductGrid({
   onLoadMore,
   onClearFilters
 }: ProductGridProps) {
+  const navigate = useNavigate()
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6 sm:gap-8">
-        {[1, 2, 3, 4, 5, 6].map(i => (
-          <div key={i} className="space-y-4">
-            <Skeleton className="aspect-square rounded-2xl" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-12">
+        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+          <div key={i} className="space-y-6">
+            <Skeleton className="aspect-[4/5] rounded-[2.5rem]" />
             <Skeleton className="h-4 w-2/3" />
             <Skeleton className="h-6 w-1/3" />
           </div>
@@ -41,74 +44,77 @@ export function ProductGrid({
 
   return (
     <>
-      <div className="flex items-center justify-between mb-8">
-         <Badge variant="outline" className="py-1 px-3 border-slate-200 text-slate-500 font-bold">
-          {products.length} Products Found
-        </Badge>
-        <div className="flex gap-2">
-          <button className="p-2 bg-white rounded-lg border border-slate-200 text-slate-900 shadow-sm"><LayoutGrid size={18} /></button>
-        </div>
+      <div className="flex items-center justify-between mb-12 border-b border-stone-100 pb-8 tracking-tight">
+         <div className="flex items-center gap-3">
+           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+             {products.length} Curated Essentials
+           </span>
+         </div>
+         <div className="flex gap-4">
+           <button className="w-10 h-10 flex items-center justify-center bg-white rounded-full border border-stone-100 text-slate-900 shadow-sm hover:shadow-md transition-all"><LayoutGrid size={16} /></button>
+         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-24">
         {products.map(product => (
-          <Link
+          <div
             key={product.id}
-            to={`/product/${product.id}`}
-            className="group"
+            onClick={() => navigate(`/product/${product.id}`)}
+            className="group cursor-pointer flex flex-col"
           >
-            <Card className="h-full overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col bg-white">
-              {/* Image */}
-              <div className="relative aspect-square bg-stone-100 overflow-hidden flex-shrink-0">
-                {product.product_images?.[0] ? (
-                  <ProductImage
-                    src={product.product_images[0].url}
-                    alt={product.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                    transformOptions={{ width: 400, quality: 75, format: 'webp' }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-stone-300">
-                    <Package size={40} />
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
-              </div>
-
-              {/* Content */}
-              <div className="p-4 flex flex-col flex-1">
-                {/* Store Name */}
-                {(product as any).seller_store?.store_name && (
-                  <Link
-                    to={`/store/${(product as any).seller_store?.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-slate-900 transition-colors mb-2 block"
-                  >
-                    {(product as any).seller_store?.store_name}
-                  </Link>
-                )}
-
-                {/* Title */}
-                <h3 className="font-bold text-sm leading-tight text-slate-900 line-clamp-2 mb-auto">
-                  {product.title}
-                </h3>
-
-                {/* Description */}
-                {product.description && (
-                  <p className="text-xs text-stone-500 line-clamp-1 mt-2 mb-3">
-                    {product.description}
-                  </p>
-                )}
-
-                {/* Price */}
-                <div className="pt-3 border-t border-stone-100 mt-3">
-                  <span className="text-lg font-black text-slate-900">
-                    R {product.price.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </span>
+            {/* Image Container */}
+            <div className="relative aspect-[4/5] bg-white rounded-[2.5rem] overflow-hidden mb-8 border border-stone-100 shadow-sm group-hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.12)] transition-all duration-700">
+              {product.product_images?.[0] ? (
+                <ProductImage
+                  src={product.product_images[0].url}
+                  alt={product.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
+                  transformOptions={{ width: 600, quality: 85, format: 'webp' }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-stone-50 text-stone-200">
+                  <Package size={48} />
+                </div>
+              )}
+              
+              {/* Overlay for quick info/action */}
+              <div className="absolute inset-0 bg-slate-950/0 group-hover:bg-slate-950/5 transition-colors duration-700" />
+              
+              <div className="absolute top-6 right-6 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                <div className="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl text-slate-950">
+                   <Search size={18} />
                 </div>
               </div>
-            </Card>
-          </Link>
+            </div>
+
+            {/* Content Container */}
+            <div className="flex flex-col flex-1 px-1">
+              {/* Store Name Badge */}
+              {(product as any).seller_store?.store_name && (
+                <div className="flex mb-4">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full">
+                    {(product as any).seller_store?.store_name}
+                  </span>
+                </div>
+              )}
+
+              {/* Title */}
+              <h3 className="text-xl font-bold text-slate-900 tracking-tight leading-tight group-hover:text-stone-600 transition-colors duration-300">
+                {product.title}
+              </h3>
+
+              {/* Price & Action Row */}
+              <div className="flex items-center justify-between mt-6 pt-6 border-t border-stone-100">
+                <span className="text-2xl font-black text-slate-900">
+                  R {product.price.toLocaleString('en-ZA')}
+                </span>
+                <div className="w-12 h-12 rounded-2xl bg-stone-50 flex items-center justify-center text-slate-400 group-hover:bg-slate-950 group-hover:text-white transition-all duration-500 shadow-sm">
+                  <Plus size={20} />
+                </div>
+              </div>
+            </div>
+          </div>
         ))}
       </div>
 

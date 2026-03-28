@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { user, profile, loading } = useAuth()
+  const { user, profile, isVerified, loading } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -31,6 +31,11 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
     if (!profile || !allowedRoles.includes(profile.role)) {
       return <Navigate to="/" replace />
     }
+  }
+
+  // Block unverified sellers from protected routes EXCEPT the onboarding route
+  if (profile?.role === 'seller' && !isVerified && !location.pathname.includes('/onboarding')) {
+    return <Navigate to="/seller/onboarding" replace />
   }
 
   return <>{children}</>

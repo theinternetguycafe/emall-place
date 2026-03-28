@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchCategoryThumbnails, getPlaceholderImage } from '../lib/categories'
 import { Product, Category } from '../types'
-import { Search, Filter, SlidersHorizontal, ChevronRight, ChevronLeft, X, LayoutGrid, Package } from 'lucide-react'
+import { Search, Filter, SlidersHorizontal, ChevronRight, ChevronLeft, X, LayoutGrid, Package, Map as MapIcon } from 'lucide-react'
 import ProductImage from '../components/ProductImage'
 import ErrorAlert from '../components/ErrorAlert'
 import { Button } from '../components/ui/Button'
@@ -14,9 +14,7 @@ import { Input } from '../components/ui/Input'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useDebounce } from '../hooks/useDebounce'
 import { Helmet } from 'react-helmet-async'
-import { ProductGrid } from '../components/shop/ProductGrid'
-import { CategoryFilterBar } from '../components/shop/CategoryFilterBar'
-import { ShopFilters } from '../components/shop/ShopFilters'
+import { ShopMap, ProductGrid, CategoryFilterBar, ShopFilters } from '../components/shop'
 
 export default function Shop() {
   const { profile } = useAuth()
@@ -26,6 +24,8 @@ export default function Shop() {
   const [categoryThumbnails, setCategoryThumbnails] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid')
+  const [userLocation, setUserLocation] = useState<any>(null)
   const categoryScrollRef = useRef<HTMLDivElement>(null)
   
   const [searchInput, setSearchInput] = useState(searchParams.get('q') || '')
@@ -69,6 +69,17 @@ export default function Shop() {
     }
   }, [page, filtersKey, currentFiltersKey])
 
+  useEffect(() => {
+    if (viewMode === 'map' && !userLocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+      }, (err) => {
+        console.error("Geolocation failed:", err)
+        setUserLocation({ lat: -25.5585, lng: 28.0183 }) // Hebron Mall Northwest fallback
+      })
+    }
+  }, [viewMode])
+
   const fetchCategories = async () => {
     const { data, error } = await supabase.from('categories').select('*').order('name')
     if (error) {
@@ -101,7 +112,7 @@ export default function Shop() {
     try {
       let query = supabase
         .from('products')
-        .select('*, product_images(*)', { count: 'exact' })
+        .select('*, product_images(*), seller_store:seller_stores(*)', { count: 'exact' })
         .eq('status', 'approved')
 
       if (selectedCategory !== 'all') {
@@ -201,46 +212,100 @@ export default function Shop() {
         <title>Marketplace | eMall Place Collective</title>
         <meta name="description" content="Browse authentic local products from independent South African creators." />
       </Helmet>
-      <div className="bg-[#F9F8F6] min-h-screen">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+      <div className="bg-[#FAF9F6] min-h-screen relative overflow-hidden">
+        {/* Decorative background elements */}
+        <div className="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-stone-100/50 to-transparent pointer-events-none" />
+        <div className="absolute top-[10%] -right-20 w-96 h-96 bg-emerald-50/30 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-[20%] -left-20 w-72 h-72 bg-amber-50/20 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 relative z-10">
         {/* Header Area */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
-          <div className="max-w-xl">
-            <nav className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">
-              <Link to="/" className="hover:text-slate-900 transition-colors">Home</Link>
-              <ChevronRight className="h-3 w-3" />
-              <span className="text-slate-900">Marketplace</span>
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-12 mb-20 animate-in fade-in slide-in-from-top-8 duration-1000">
+          <div className="max-w-2xl">
+            <nav className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-stone-400 mb-8">
+              <Link to="/" className="hover:text-slate-900 transition-colors">Digital Home</Link>
+              <div className="w-1 h-1 rounded-full bg-stone-300" />
+              <span className="text-slate-900">Collective Market</span>
             </nav>
-            <h1 className="text-5xl font-black tracking-tighter text-slate-900 uppercase">Shop</h1>
-            <p className="text-slate-500 mt-2">Browse items from independent creators.</p>
+            <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-slate-900 uppercase leading-[0.85] mb-6">
+              The <br />
+              <span className="text-stone-300 italic">Collective.</span>
+            </h1>
+            <p className="text-lg text-stone-500 font-medium max-w-md leading-relaxed">
+              Curated essentials and unique creations from the finest independent artisans across South Africa.
+            </p>
           </div>
           
-          <ShopFilters
-            searchInput={searchInput}
-            onSearchChange={handleSearchChange}
-            sortBy={sortBy}
-            onSortChange={handleSortChange}
-          />
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="flex bg-white/50 backdrop-blur-xl rounded-full p-1.5 border border-white shadow-2xl shadow-stone-200/50">
+              <button 
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center gap-2 px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'grid' ? 'bg-slate-900 text-white shadow-lg' : 'text-stone-400 hover:text-slate-900'}`}
+              >
+                <LayoutGrid size={14} /> Gallery
+              </button>
+              <button 
+                onClick={() => setViewMode('map')}
+                className={`flex items-center gap-2 px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'map' ? 'bg-slate-900 text-white shadow-lg' : 'text-stone-400 hover:text-slate-900'}`}
+              >
+                <MapIcon size={14} /> Proximity
+              </button>
+            </div>
+            
+            <div className="h-10 w-px bg-stone-200 hidden md:block" />
+
+            <ShopFilters
+              searchInput={searchInput}
+              onSearchChange={handleSearchChange}
+              sortBy={sortBy}
+              onSortChange={handleSortChange}
+            />
+          </div>
         </div>
 
         {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
 
-        <CategoryFilterBar
-          categories={categories}
-          categoryThumbnails={categoryThumbnails}
-          selectedCategory={selectedCategory}
-          onSelectCategory={handleCategoryChange}
-          getPlaceholderImage={getPlaceholderImage}
-        />
+        {viewMode === 'map' ? (
+          <div className="animate-in fade-in slide-in-from-bottom-4 mb-12">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Discovery Map</h2>
+                <p className="text-stone-500 font-medium lowercase">find independent stores in your immediate vicinity</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-[40px] overflow-hidden h-[650px] border border-stone-100 shadow-2xl shadow-slate-200/50 relative">
+               <ShopMap 
+                 products={products} 
+                 userLocation={userLocation}
+               />
+               <div className="absolute top-6 left-6 z-10">
+                 <div className="bg-white/95 backdrop-blur-md px-5 py-2.5 rounded-full shadow-lg border border-stone-100 flex items-center gap-3">
+                   <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">Real-Time Distribution Active</span>
+                 </div>
+               </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <CategoryFilterBar
+              categories={categories}
+              categoryThumbnails={categoryThumbnails}
+              selectedCategory={selectedCategory}
+              onSelectCategory={handleCategoryChange}
+              getPlaceholderImage={getPlaceholderImage}
+            />
 
-        <ProductGrid
-          products={products}
-          loading={loading}
-          hasMore={hasMore}
-          loadingMore={loadingMore}
-          onLoadMore={() => setPage(p => p + 1)}
-          onClearFilters={() => handleCategoryChange('all')}
-        />
+            <ProductGrid
+              products={products}
+              loading={loading}
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              onLoadMore={() => setPage(p => p + 1)}
+              onClearFilters={() => handleCategoryChange('all')}
+            />
+          </>
+        )}
       </div>
     </div>
     </>

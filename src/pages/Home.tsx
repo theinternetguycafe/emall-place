@@ -13,12 +13,15 @@ import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
 import { OnboardingModal } from '../components/onboarding/OnboardingModal'
 import { Helmet } from 'react-helmet-async'
+import ServicesSlider from '../components/home/ServicesSlider'
+import { SellerCautionNote } from '../components/seller/SellerCautionNote'
 
 export default function Home() {
   const navigate = useNavigate()
   const { profile } = useAuth()
   const { isStepDone, completeStep } = useOnboarding()
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([])
+  const [featuredServices, setFeaturedServices] = useState<any[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryThumbnails, setCategoryThumbnails] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -115,6 +118,33 @@ export default function Home() {
         
         setCategories(sorted)
         setCategoryThumbnails(thumbs)
+
+        // -------- SERVICES --------
+        const { data: services, error: sError } = await supabase
+          .from('products')
+          .select(`
+            id,
+            title,
+            description,
+            price,
+            product_images:product_images(url),
+            seller_store:seller_stores!inner(
+              id,
+              store_name,
+              is_online,
+              last_seen_at,
+              average_rating,
+              seller_type
+            )
+          `)
+          .eq('status', 'approved')
+          .or('seller_type.eq.service,seller_type.eq.both', { foreignTable: 'seller_stores' })
+          .order('created_at', { ascending: false })
+          .limit(6)
+
+        if (!sError && services) {
+          setFeaturedServices(services)
+        }
       } catch (err: any) {
         // Ignore aborts (React 18 StrictMode / navigation / unmount)
         if (err?.name === "AbortError" || String(err?.message || "").toLowerCase().includes("aborted")) {
@@ -172,41 +202,40 @@ export default function Home() {
         <meta name="description" content="Shop directly from independent creators across Mzansi. Quality goods, fair prices, secure payments." />
       </Helmet>
       <div className="space-y-32 pb-32">
+      <SellerCautionNote />
       {/* HERO */}
-      <section className="relative h-[90vh] min-h-[700px] flex items-center overflow-hidden">
+      <section className="relative h-[95vh] min-h-[750px] flex items-center overflow-hidden">
         <div className="absolute inset-0 bg-slate-950">
           <img
-            src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=2070"
-            alt="Marketplace"
-            className="w-full h-full object-cover opacity-40 scale-105"
+            src="https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&q=80&w=2070"
+            alt="Premium Marketplace"
+            className="w-full h-full object-cover opacity-60 scale-105"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
         </div>
 
         <div className="container mx-auto px-4 relative z-10 text-white">
-          <div className="max-w-4xl">
+          <div className="max-w-5xl">
+            <div className="inline-flex items-center gap-2 bg-emerald-500/10 backdrop-blur-md border border-emerald-500/20 px-4 py-2 rounded-full mb-8">
+              <img src="https://flagcdn.com/w20/za.png" alt="RSA" className="h-3 w-auto" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Proudly South African</span>
+            </div>
 
-            <Badge
-              variant="outline"
-              className="text-white border-white/20 bg-white/10 backdrop-blur-md mb-8 py-2 px-6 rounded-full text-[10px] font-black tracking-[0.2em] flex items-center gap-2 w-max"
-            >
-              <img src="https://flagcdn.com/w20/za.png" alt="South Africa Flag" className="h-3 w-auto object-contain" /> Support Local Business
-            </Badge>
-
-            <h1 className="text-6xl md:text-[7rem] pb-4 font-black leading-[0.85] tracking-tighter mb-10 text-white">
-              Discover amazing <br />
-              products from <br />
-              <span className="inline-block pt-2 text-stone-400 italic">LOCAL SELLERS.</span>
+            <h1 className="text-6xl md:text-[8rem] font-black leading-[0.8] tracking-tighter mb-12 text-white uppercase italic">
+              Mzansi's <br />
+              <span className="text-stone-400">Finest</span> <br />
+              Collective.
             </h1>
 
-            <p className="text-xl text-stone-300 mb-12 leading-relaxed max-w-xl font-medium">
-              Shop directly from independent creators across Mzansi. Quality goods, fair prices, secure payments powered by Yoco.
+            <p className="text-xl md:text-2xl text-stone-300 mb-14 leading-relaxed max-w-2xl font-medium">
+              Discover handpicked treasures from local creators. 
+              Fresh finds, honest prices, and safe payments for everyone.
             </p>
 
             <div className="flex flex-wrap gap-6">
               <Link to="/shop">
-                <Button size="lg" className="rounded-full px-12 py-8 text-lg font-black bg-white text-slate-950 hover:bg-stone-200">
-                  Explore Marketplace <ArrowRight className="ml-3 h-6 w-6" />
+                <Button size="lg" className="rounded-full px-12 py-9 text-xl font-black bg-white text-slate-950 hover:bg-emerald-50 transition-all shadow-[0_20px_40px_-15px_rgba(255,255,255,0.3)]">
+                  Explore Now <ArrowRight className="ml-3 h-6 w-6" />
                 </Button>
               </Link>
 
@@ -214,9 +243,9 @@ export default function Home() {
                 <Button
                   variant="outline"
                   size="lg"
-                  className="rounded-full px-12 py-8 text-lg font-black border-white/20 text-white hover:bg-white hover:text-slate-950 backdrop-blur-sm"
+                  className="rounded-full px-12 py-9 text-xl font-black border-white/20 text-white hover:bg-white hover:text-slate-950 backdrop-blur-md transition-all"
                 >
-                  Become a Partner
+                  Join the Fam
                 </Button>
               </Link>
             </div>
@@ -225,60 +254,58 @@ export default function Home() {
       </section>
 
       {/* TRUST STRIP */}
-      <section className="container mx-auto px-4 -mt-48 relative z-20">
-        <Card className="p-0 overflow-hidden border-none shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] rounded-[2.5rem] bg-white">
-          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-stone-100">
-            <div className="p-12 flex flex-col items-center text-center gap-6 group">
-              <div className="bg-emerald-50 text-emerald-600 p-5 rounded-3xl group-hover:scale-110 group-hover:bg-emerald-100 transition-all duration-500">
+      <section className="container mx-auto px-4 -mt-32 relative z-20">
+        <div className="bg-white/80 backdrop-blur-2xl rounded-[3rem] p-4 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.15)] border border-white">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-10 flex flex-col items-center text-center gap-6 group rounded-[2.5rem] hover:bg-white transition-all duration-500">
+              <div className="bg-emerald-50 text-emerald-600 p-6 rounded-3xl group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500">
                 <ShieldCheck className="h-10 w-10" />
               </div>
               <div>
-                <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Secure Payments</h3>
-                <p className="text-stone-500 text-sm font-medium leading-relaxed">
-                  Secure payments powered by <span className="font-bold text-blue-600">Yoco</span>. Only confirm payments you started.
-                </p>
+                <h3 className="font-black text-xl mb-3 text-slate-900 uppercase tracking-tight">Safe as Houses</h3>
+                <p className="text-stone-500 text-sm font-medium leading-relaxed">Secure Yoco payments. We keep your hard-earned money safe.</p>
               </div>
             </div>
 
-            <div className="p-12 flex flex-col items-center text-center gap-6 group">
-              <div className="bg-blue-50 text-blue-600 p-5 rounded-3xl group-hover:scale-110 group-hover:bg-blue-100 transition-all duration-500">
+            <div className="p-10 flex flex-col items-center text-center gap-6 group rounded-[2.5rem] hover:bg-white transition-all duration-500">
+              <div className="bg-blue-50 text-blue-600 p-6 rounded-3xl group-hover:bg-blue-600 group-hover:text-white transition-all duration-500">
                 <Truck className="h-10 w-10" />
               </div>
               <div>
-                <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Safe Delivery</h3>
-                <p className="text-stone-500 text-sm font-medium leading-relaxed">Reliable and fast tracked delivery across South Africa. Your goods, safely to your door.</p>
+                <h3 className="font-black text-xl mb-3 text-slate-900 uppercase tracking-tight">Lekker Delivery</h3>
+                <p className="text-stone-500 text-sm font-medium leading-relaxed">Fast, tracked, and reliable. From their hands to your doorstep.</p>
               </div>
             </div>
 
-            <div className="p-12 flex flex-col items-center text-center gap-6 group">
-              <div className="bg-amber-50 text-amber-500 p-5 rounded-3xl group-hover:scale-110 group-hover:bg-amber-100 transition-all duration-500">
+            <div className="p-10 flex flex-col items-center text-center gap-6 group rounded-[2.5rem] hover:bg-white transition-all duration-500">
+              <div className="bg-amber-50 text-amber-500 p-6 rounded-3xl group-hover:bg-amber-500 group-hover:text-white transition-all duration-500">
                 <Star className="h-10 w-10" />
               </div>
               <div>
-                <h3 className="font-black text-xl mb-2 text-slate-900 uppercase tracking-tight">Quality Items</h3>
-                <p className="text-stone-500 text-sm font-medium leading-relaxed">Every seller is vetted to ensure you get exactly what you ordered.</p>
+                <h3 className="font-black text-xl mb-3 text-slate-900 uppercase tracking-tight">Certified Quality</h3>
+                <p className="text-stone-500 text-sm font-medium leading-relaxed">We vet every seller. Only the best craft makes it to the collective.</p>
               </div>
             </div>
           </div>
-        </Card>
+        </div>
       </section>
 
       {/* CATEGORIES */}
       <section className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8 border-b border-stone-100 pb-12">
           <div className="max-w-2xl">
-            <Badge variant="outline" className="mb-4 border-stone-200 text-stone-400 rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest">
-              Shop
+            <Badge variant="outline" className="mb-4 border-emerald-200 text-emerald-600 bg-emerald-50 rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest">
+              Fresh Finds
             </Badge>
-            <h2 className="text-5xl font-black tracking-tight text-slate-900 uppercase leading-none">
-              Browse <br />
-              <span className="text-stone-300">Categories</span>
+            <h2 className="text-5xl md:text-6xl font-black tracking-tight text-slate-900 uppercase leading-[0.9]">
+              The <br />
+              <span className="text-stone-300">Top Picks</span>
             </h2>
           </div>
 
           <Link to="/shop">
-            <Button variant="outline" className="rounded-full px-8 py-6 font-black uppercase tracking-widest text-[10px] group">
-              Browse All <ArrowUpRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+            <Button variant="outline" className="rounded-full px-8 py-6 font-black uppercase tracking-widest text-[10px] group border-stone-200">
+              See Everything <ArrowUpRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
             </Button>
           </Link>
         </div>
@@ -299,7 +326,7 @@ export default function Home() {
               const thumbUrl = categoryThumbnails[category.id] || getPlaceholderImage()
               return (
                 <Link key={category.id} to={`/shop?category=${category.id}`} className="group flex flex-col items-center flex-shrink-0 w-32 sm:w-40">
-                  <div className="w-full aspect-[4/5] rounded-[2rem] bg-stone-100 mb-6 overflow-hidden relative border border-stone-200 shadow-sm group-hover:shadow-lg transition-all duration-300">
+                  <div className="w-full aspect-[4/5] rounded-[2.5rem] bg-stone-100 mb-6 overflow-hidden relative border border-stone-200 shadow-sm group-hover:shadow-lg transition-all duration-300">
                     <img
                       src={thumbUrl}
                       alt={category.name}
@@ -328,22 +355,25 @@ export default function Home() {
         </div>
       </section>
 
+      {/* SERVICES SLIDER */}
+      <ServicesSlider services={featuredServices} />
+
       {/* FEATURED PRODUCTS */}
       <section className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8 border-b border-stone-100 pb-12">
           <div className="max-w-2xl">
-            <Badge variant="outline" className="mb-4 border-stone-200 text-stone-400 rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest">
-              Popular
+            <Badge variant="outline" className="mb-4 border-blue-200 text-blue-600 bg-blue-50 rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest">
+              Local Favorites
             </Badge>
-            <h2 className="text-5xl font-black tracking-tight text-slate-900 uppercase leading-none">
-              Popular <br />
-              <span className="text-stone-300">Items</span>
+            <h2 className="text-5xl md:text-6xl font-black tracking-tight text-slate-900 uppercase leading-[0.9]">
+              Handpicked <br />
+              <span className="text-stone-300">For You</span>
             </h2>
           </div>
 
           <Link to="/shop">
-            <Button variant="outline" className="rounded-full px-8 py-6 font-black uppercase tracking-widest text-[10px] group">
-              Full Archive <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            <Button variant="outline" className="rounded-full px-8 py-6 font-black uppercase tracking-widest text-[10px] group border-stone-200">
+              The Full Stack <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
           </Link>
         </div>
@@ -356,7 +386,7 @@ export default function Home() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-12">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="space-y-6">
-                <Skeleton className="aspect-square rounded-[2rem]" />
+                <Skeleton className="aspect-square rounded-[2.5rem]" />
                 <Skeleton className="h-4 w-2/3" />
                 <Skeleton className="h-6 w-1/3" />
               </div>
@@ -374,7 +404,7 @@ export default function Home() {
 
               return (
                 <Link key={product.id} to={`/product/${product.id}`} className="group flex flex-col">
-                  <div className="aspect-square bg-white rounded-[2rem] overflow-hidden mb-8 relative shadow-sm border border-stone-100 group-hover:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.1)] transition-all duration-700">
+                  <div className="aspect-square bg-white rounded-[2.5rem] overflow-hidden mb-8 relative shadow-sm border border-stone-100 group-hover:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.1)] transition-all duration-700">
                     <ProductImage
                       src={imageUrl}
                       alt={product.title || 'Product'}
@@ -427,9 +457,9 @@ export default function Home() {
     {/* Buyer Welcome Modal */}
     <OnboardingModal
       isOpen={showWelcomeModal}
-      title="Welcome to the Marketplace!"
-      body="Discover unique handcrafted products from talented artisans. Browse our collection and support local makers."
-      ctaLabel="Start Exploring"
+      title="Howzit! Welcome to eMall Place."
+      body="Discover one-of-a-kind treasures from local makers right here in Mzansi. Support the fam and find something special today."
+      ctaLabel="Start Browsing"
       onClose={handleWelcomeModalClose}
     />
     </>

@@ -138,6 +138,9 @@ export default function StoreSettingsForm({ store, onSaved }: StoreSettingsFormP
     const { error } = await supabase.storage.from(bucket).upload(fileName, file)
 
     if (error) {
+      if (error.message?.includes('bucket not found')) {
+        throw new Error(`Storage bucket "${bucket}" not found. Please run the initialize_storage_buckets.sql script in your Supabase SQL Editor.`)
+      }
       throw new Error(`Failed to upload file: ${error.message}`)
     }
 

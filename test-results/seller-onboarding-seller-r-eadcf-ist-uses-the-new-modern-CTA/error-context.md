@@ -1,0 +1,105 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e4]: Complimentary Delivery on Orders Over R1000
+  - banner [ref=e5]:
+    - navigation [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - link "e eMallPlace Collective" [ref=e9] [cursor=pointer]:
+            - /url: "#/"
+            - generic [ref=e11]: e
+            - generic [ref=e12]:
+              - generic [ref=e13]: eMallPlace
+              - generic [ref=e14]: Collective
+          - link "Marketplace" [ref=e16] [cursor=pointer]:
+            - /url: "#/marketplace"
+        - generic [ref=e17]:
+          - link [ref=e18] [cursor=pointer]:
+            - /url: "#/cart"
+            - img [ref=e19]
+          - generic [ref=e24]:
+            - link "Sign In" [ref=e25] [cursor=pointer]:
+              - /url: "#/auth"
+              - button "Sign In" [ref=e26]
+            - link "Register" [ref=e27] [cursor=pointer]:
+              - /url: "#/auth?signup=true"
+              - button "Register" [ref=e28]
+  - main [ref=e29]:
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - img [ref=e34]
+        - heading "Sign In" [level=1] [ref=e37]
+        - paragraph [ref=e38]: Access your account and shop.
+      - generic [ref=e39]:
+        - generic [ref=e40]:
+          - button "Sign In" [ref=e41] [cursor=pointer]
+          - button "Register" [ref=e42] [cursor=pointer]
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - text: Email
+            - textbox "name@example.com" [ref=e45]
+          - generic [ref=e46]:
+            - text: Password
+            - textbox "••••••••" [ref=e47]
+          - button "Sign In" [ref=e48] [cursor=pointer]:
+            - generic [ref=e49]:
+              - generic [ref=e50]: Sign In
+              - img [ref=e51]
+        - paragraph [ref=e53]: Don't have an account? Click register above.
+  - contentinfo [ref=e54]:
+    - generic [ref=e55]:
+      - generic [ref=e56]:
+        - generic [ref=e57]:
+          - link "e eMallPlace" [ref=e58] [cursor=pointer]:
+            - /url: "#/"
+            - generic [ref=e60]: e
+            - generic [ref=e61]: eMallPlace
+          - paragraph [ref=e62]: South Africa's premier multi-vendor collective. We bridge the gap between independent artisans and discerning customers.
+        - generic [ref=e63]:
+          - heading "Experience" [level=4] [ref=e64]
+          - list [ref=e65]:
+            - listitem [ref=e66]:
+              - link "The Marketplace" [ref=e67] [cursor=pointer]:
+                - /url: "#/shop"
+            - listitem [ref=e68]:
+              - link "New Arrivals" [ref=e69] [cursor=pointer]:
+                - /url: "#/shop?sort=newest"
+            - listitem [ref=e70]:
+              - link "Trending" [ref=e71] [cursor=pointer]:
+                - /url: "#/shop"
+        - generic [ref=e72]:
+          - heading "Service" [level=4] [ref=e73]
+          - list [ref=e74]:
+            - listitem [ref=e75]:
+              - link "Help Centre" [ref=e76] [cursor=pointer]:
+                - /url: "#/help-centre"
+            - listitem [ref=e77]:
+              - link "Shipping & Delivery" [ref=e78] [cursor=pointer]:
+                - /url: "#/shipping-policy"
+            - listitem [ref=e79]:
+              - link "Returns Policy" [ref=e80] [cursor=pointer]:
+                - /url: "#/returns-policy"
+        - generic [ref=e81]:
+          - heading "Sellers" [level=4] [ref=e82]
+          - list [ref=e83]:
+            - listitem [ref=e84]:
+              - link "Become a Seller" [ref=e85] [cursor=pointer]:
+                - /url: "#/auth?signup=true"
+            - listitem [ref=e86]:
+              - link "Seller Guidelines" [ref=e87] [cursor=pointer]:
+                - /url: "#/seller-guidelines"
+            - listitem [ref=e88]:
+              - link "Community Hub" [ref=e89] [cursor=pointer]:
+                - /url: "#/community"
+      - generic [ref=e90]:
+        - paragraph [ref=e91]: © 2026 eMall Place Collective.
+        - generic [ref=e92]:
+          - link "Privacy" [ref=e93] [cursor=pointer]:
+            - /url: "#/"
+          - link "Terms" [ref=e94] [cursor=pointer]:
+            - /url: "#/"
+          - link "Legal" [ref=e95] [cursor=pointer]:
+            - /url: "#/"
+```

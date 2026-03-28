@@ -59,6 +59,18 @@ export interface SellerStore {
   store_policies?: StorePolicies | null
   featured_product_ids?: string[] | null
   banner_url?: string | null
+  // Phase 6.5 fields
+  is_online?: boolean | null
+  last_seen_at?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  // Phase 8 fields
+  is_verified?: boolean
+  kyc_status?: 'pending' | 'verified' | 'rejected'
+  seller_type?: 'product' | 'service' | 'both'
+  service_mode?: 'on_site' | 'in_house' | 'both' | null
+  radius_km?: number | null
+  address?: string | null
 }
 
 export interface StorePolicies {
@@ -97,4 +109,21 @@ export interface OrderItem {
   item_status: 'pending' | 'packed' | 'shipped' | 'delivered' | 'cancelled'
   product?: Product
   seller_store?: SellerStore
+}
+
+export type ServiceRequestStatus = 'broadcasting' | 'accepted' | 'in_progress' | 'completed' | 'expired'
+
+export interface ServiceRequest {
+  id: string
+  buyer_id: string
+  category_id?: string | null
+  title: string
+  description?: string | null
+  budget?: number | null
+  latitude: number
+  longitude: number
+  status: ServiceRequestStatus
+  assigned_seller_id?: string | null
+  expires_at: string
+  created_at: string
 }

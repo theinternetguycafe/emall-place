@@ -43,11 +43,18 @@ export default function SalesManagement({ isAdmin }: SalesManagementProps) {
   const fetchProducts = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('products')
         .select('*, seller_store:seller_store_id(*)')
-        .eq('status', 'approved')
         .order('created_at', { ascending: false })
+
+      // If not admin, only show approved products. 
+      // But this component seems to be primarily for admin use given the prop 'isAdmin'.
+      if (!isAdmin) {
+        query = query.eq('status', 'approved')
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
       setProducts(data || [])
@@ -231,6 +238,23 @@ export default function SalesManagement({ isAdmin }: SalesManagementProps) {
     }
   }
 
+  const handleDeleteProduct = async (productId: string) => {
+    if (!confirm('PERMANENTLY DELETE this product? This cannot be undone.')) return
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId)
+
+      if (error) throw error
+      fetchProducts()
+    } catch (err: any) {
+      console.error('Error deleting product:', err)
+      alert('Failed to delete product')
+    }
+  }
+
   const handleBulkRemoveSale = async () => {
     if (selectedProducts.size === 0) {
       alert('Select products to remove sale')
@@ -380,16 +404,15 @@ export default function SalesManagement({ isAdmin }: SalesManagementProps) {
                       >
                         <Edit2 size={18} />
                       </Button>
-                      {product.is_on_sale && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-rose-600 hover:bg-rose-50 rounded-full"
-                          onClick={() => handleRemoveSale(product.id)}
-                        >
-                          <Trash2 size={18} />
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-rose-600 hover:bg-rose-50 rounded-full"
+                        onClick={() => handleDeleteProduct(product.id)}
+                        title="Permanently Delete"
+                      >
+                        <Trash2 size={18} />
+                      </Button>
                     </div>
                   </td>
                 </tr>

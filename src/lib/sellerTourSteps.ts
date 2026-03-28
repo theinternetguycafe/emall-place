@@ -15,10 +15,7 @@ export const SELLER_TOUR_STEPS: SpotlightStep[] = [
     selector: '[data-tour="store-create-cta"]',
     optional: true,
     link: '/seller',
-    advanceOn: {
-      type: 'event',
-      eventName: 'store-form-opened',
-    },
+
   },
   {
     id: 'store-name',
@@ -99,7 +96,6 @@ export const SELLER_TOUR_STEPS: SpotlightStep[] = [
     body: 'Upload clear photos that prove quality and build confidence. Start with one strong hero shot, then add more angles or close-up detail if you have them.',
     selector: '[data-tour="product-image-trigger"]',
     link: '/seller/products/new',
-    panelPlacement: 'left',
   },
   {
     id: 'publish',
@@ -107,10 +103,5 @@ export const SELLER_TOUR_STEPS: SpotlightStep[] = [
     body: 'When the title, price, stock, category, description, and images are all in place, publish the product so review can start cleanly.',
     selector: '[data-tour="publish-product"]',
     link: '/seller/products/new',
-    advanceOn: {
-      type: 'event',
-      eventName: 'seller-tour:product-published',
-    },
-    panelPlacement: 'top',
   },
 ]

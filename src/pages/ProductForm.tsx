@@ -114,7 +114,7 @@ export default function ProductForm() {
         price: parseFloat(formData.price),
         stock: parseInt(formData.stock),
         category_id: formData.category_id || null,
-        status: 'pending' 
+        status: 'approved' 
       }
 
       let productId = id

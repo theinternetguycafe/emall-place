@@ -5,20 +5,22 @@ interface SellerOrdersTableProps {
   filteredOrders: any[]
   searchQuery: string
   updateItemStatus: (itemId: string, status: string) => Promise<void>
+  sellerType?: 'product' | 'service' | 'both'
 }
 
 export function SellerOrdersTable({
   filteredOrders,
   searchQuery,
-  updateItemStatus
+  updateItemStatus,
+  sellerType
 }: SellerOrdersTableProps) {
   return (
     <table className="w-full min-w-[800px] text-left">
       <thead>
         <tr className="bg-stone-50/50">
-          <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Order ID</th>
+          <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">{sellerType === 'service' ? 'Job ID' : 'Order ID'}</th>
           <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Customer</th>
-          <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Product</th>
+          <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">{sellerType === 'service' ? 'Service' : 'Product'}</th>
           <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Amount</th>
           <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Status</th>
           <th className="px-8 py-4 text-right text-[10px] font-black uppercase tracking-widest text-stone-400">Manage</th>
@@ -67,9 +69,19 @@ export function SellerOrdersTable({
                 onChange={(e) => updateItemStatus(item.id, e.target.value)}
               >
                 <option value="pending">Pending</option>
-                <option value="packed">Packed</option>
-                <option value="shipped">Shipped</option>
-                <option value="delivered">Delivered</option>
+                {sellerType === 'service' ? (
+                  <>
+                    <option value="accepted">Accepted</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="packed">Packed</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                  </>
+                )}
                 <option value="cancelled">Cancelled</option>
               </select>
             </td>

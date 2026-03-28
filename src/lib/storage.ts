@@ -96,7 +96,11 @@ export async function uploadProductImage(file: File): Promise<string | null> {
       })
 
     if (error) {
-      console.error('[Storage] Upload failed:', error)
+      if (error.message?.includes('bucket not found')) {
+        console.error('[Storage] ERROR: Storage bucket "marketplace" not found. Please run the initialize_storage_buckets.sql script in your Supabase SQL Editor.')
+      } else {
+        console.error('[Storage] Upload failed:', error)
+      }
       return null
     }
 

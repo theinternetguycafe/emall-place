@@ -2,6 +2,7 @@ import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCart } from '../contexts/CartContext'
+import { supabase } from '../lib/supabase'
 import { ShoppingCart, User as UserIcon, Store, LogOut, Search, Menu, X, ShieldCheck } from 'lucide-react'
 import { Button } from './ui/Button'
 
@@ -14,6 +15,21 @@ export default function Layout({ children }: LayoutProps) {
   const { itemCount } = useCart()
   const location = useLocation()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
+
+  // Global Seller Heartbeat
+  React.useEffect(() => {
+    if (profile?.role === 'seller') {
+      const interval = setInterval(async () => {
+        try {
+          await supabase
+            .from('seller_stores')
+            .update({ last_seen_at: new Date().toISOString() })
+            .eq('owner_id', profile.id);
+        } catch (err) {}
+      }, 30000); // 30s heartbeat is enough for global
+      return () => clearInterval(interval);
+    }
+  }, [profile]);
 
   const isActive = (path: string) => location.pathname === path
 
@@ -45,9 +61,9 @@ export default function Layout({ children }: LayoutProps) {
               {/* Desktop Nav */}
               <div className="hidden md:flex items-center space-x-2">
                 <Link 
-                  to="/shop" 
+                  to="/marketplace" 
                   className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
-                    isActive('/shop') ? 'text-slate-900 bg-stone-100' : 'text-stone-400 hover:text-slate-900 hover:bg-stone-50'
+                    isActive('/marketplace') ? 'text-slate-900 bg-stone-100' : 'text-stone-400 hover:text-slate-900 hover:bg-stone-50'
                   }`}
                 >
                   Marketplace
@@ -79,8 +95,8 @@ export default function Layout({ children }: LayoutProps) {
                         </Link>
                       )}
                       {profile?.role === 'admin' && (
-                        <Link to="/admin">
-                          <Button variant="primary" size="sm" className="rounded-full bg-slate-900">Admin</Button>
+                        <Link to="/admin/kyc">
+                          <Button variant="primary" size="sm" className="rounded-full bg-slate-900 px-6">Admin Hub</Button>
                         </Link>
                       )}
                       <Link to="/account" className="p-3 text-slate-400 hover:text-slate-900 transition-all">
@@ -146,7 +162,7 @@ export default function Layout({ children }: LayoutProps) {
             <div className="px-4 py-8 flex flex-col flex-1">
               <div className="space-y-6 flex-1">
                 <Link 
-                  to="/shop" 
+                  to="/marketplace" 
                   className="block text-2xl font-black text-slate-900 tracking-tight"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
@@ -159,6 +175,9 @@ export default function Layout({ children }: LayoutProps) {
                       <Link to="/account" className="block text-lg font-bold text-stone-500 hover:text-slate-900" onClick={() => setIsMobileMenuOpen(false)}>Account</Link>
                       {profile?.role === 'seller' && (
                         <Link to="/seller" className="block text-lg font-bold text-stone-500 hover:text-slate-900" onClick={() => setIsMobileMenuOpen(false)}>Seller Hub</Link>
+                      )}
+                      {profile?.role === 'admin' && (
+                        <Link to="/admin/kyc" className="block text-lg font-bold text-slate-900" onClick={() => setIsMobileMenuOpen(false)}>Admin Management</Link>
                       )}
                       <button onClick={() => { signOut(); setIsMobileMenuOpen(false); }} className="block w-full text-left text-lg font-bold text-rose-600 pt-4">Sign Out</button>
                     </div>

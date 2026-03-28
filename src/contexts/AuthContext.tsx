@@ -6,6 +6,9 @@ import { Profile } from '../types'
 interface AuthContextType {
   user: User | null
   profile: Profile | null
+  role: string | null
+  isAuthenticated: boolean
+  isVerified: boolean
   loading: boolean
   signOut: () => Promise<void>
 }
@@ -42,7 +45,11 @@ function setCachedProfile(profile: Profile | null) {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(() => getCachedProfile())
+  const [isVerified, setIsVerified] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const isAuthenticated = !!user
+  const role = profile?.role || null
   const fetchingProfileFor = useRef<string | null>(null)
   const mounted = useRef(false)
   const didInit = useRef(false)
@@ -64,12 +71,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (cached && cached.id === session.user.id) {
             console.log('[AuthContext] Using cached profile for instant load');
             setProfile(cached);
+            setIsVerified(cached.role !== 'seller'); // Optimistic
           }
           await fetchProfile(session.user.id, !!cached);
         } else {
           setUser(null);
           setProfile(null);
           setCachedProfile(null);
+          setIsVerified(false);
         }
         setLoading(false);
       } catch (err: any) {
@@ -92,12 +101,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const cached = getCachedProfile();
           if (cached && cached.id === session.user.id) {
             setProfile(cached);
+            setIsVerified(cached.role !== 'seller'); // Optimistic
           }
           await fetchProfile(session.user.id, !!cached);
         } else {
           setUser(null);
           setProfile(null);
           setCachedProfile(null);
+          setIsVerified(false);
         }
         setLoading(false);
       })().catch(err => {
@@ -147,6 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           console.error('[AuthContext] Session refresh failed, signing out...')
           await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+          setIsVerified(false)
           return
         }
       }
@@ -169,6 +181,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('[AuthContext] Profile found on retry:', retryData)
           setProfile(retryData)
           setCachedProfile(retryData)
+          
+          if (retryData.role === 'seller') {
+            const { data: storeData } = await supabase.from('seller_stores').select('is_verified').eq('owner_id', userId).maybeSingle()
+            setIsVerified(storeData?.is_verified ?? false)
+          } else {
+            setIsVerified(true)
+          }
           return
         }
         
@@ -189,6 +208,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log('[AuthContext] Profile created/synced via safety net:', newProfile)
             setProfile(newProfile)
             setCachedProfile(newProfile)
+            
+            if (newProfile.role === 'seller') {
+              const { data: storeData } = await supabase.from('seller_stores').select('is_verified').eq('owner_id', userId).maybeSingle()
+              setIsVerified(storeData?.is_verified ?? false)
+            } else {
+              setIsVerified(true)
+            }
           } else {
             console.error('[AuthContext] Safety net upsert failed:', createError)
             // Create a minimal profile in memory
@@ -206,12 +232,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             console.log('[AuthContext] Using fallback profile:', fallbackProfile)
             setProfile(fallbackProfile)
+            setIsVerified(fallbackProfile.role !== 'seller')
           }
         }
       } else {
         console.log('[AuthContext] Profile loaded successfully, role:', data.role)
         setProfile(data)
         setCachedProfile(data)
+        
+        if (data.role === 'seller') {
+          const { data: storeData } = await supabase.from('seller_stores').select('is_verified').eq('owner_id', userId).maybeSingle()
+          setIsVerified(storeData?.is_verified ?? false)
+        } else {
+          setIsVerified(true)
+        }
       }
     } catch (error) {
       console.error('[AuthContext] Critical error in fetchProfile:', error)
@@ -233,6 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           console.log('[AuthContext] Using fallback profile due to error')
           setProfile(fallbackProfile)
+          setIsVerified(fallbackProfile.role !== 'seller')
         }
       } catch (e) {
         console.error('[AuthContext] Failed to get user for fallback:', e)
@@ -250,11 +285,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null)
     setProfile(null)
     setCachedProfile(null)
+    setIsVerified(false)
     setLoading(false)
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut }}>
+    <AuthContext.Provider value={{ user, profile, role, isAuthenticated, isVerified, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   )

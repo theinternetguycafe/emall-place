@@ -14,10 +14,14 @@ import { CHECKLIST_TOUR_STEPS } from './lib/checklistTourSteps'
 import Home from './pages/Home'
 import Auth from './pages/Auth'
 import Shop from './pages/Shop'
+import Marketplace from './pages/Marketplace'
 import StoreHome from './pages/StoreHome'
 import ProductDetails from './pages/ProductDetails'
 import SellerDashboard from './pages/SellerDashboard'
 import ProductForm from './pages/ProductForm'
+import SellerOnboardingWizard from './pages/onboarding/SellerOnboardingWizard'
+import AdminKYCDashboard from './pages/admin/AdminKYCDashboard';
+import AdminRoute from './components/auth/AdminRoute';
 
 import Cart from './pages/Cart'
 
@@ -65,9 +69,18 @@ function AppContent() {
       <ScrollToTop />
       <Layout>
           <Routes>
+          <Route 
+            path="/admin/kyc" 
+            element={
+              <AdminRoute>
+                <AdminKYCDashboard />
+              </AdminRoute>
+            } 
+          />
           <Route path="/" element={<Home />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/shop" element={<Shop />} />
+          <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/store/:storeId" element={<StoreHome />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
@@ -93,6 +106,14 @@ function AppContent() {
             element={
               <ProtectedRoute allowedRoles={['seller', 'admin']}>
                 <SellerDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/seller/onboarding" 
+            element={
+              <ProtectedRoute allowedRoles={['seller']}>
+                <SellerOnboardingWizard />
               </ProtectedRoute>
             } 
           />

@@ -19,6 +19,8 @@ import { StoreSetupForm } from '../components/seller/StoreSetupForm'
 import { CreateStoreCard } from '../components/seller/CreateStoreCard'
 import { SellerProductsTable } from '../components/seller/SellerProductsTable'
 import { SellerOrdersTable } from '../components/seller/SellerOrdersTable'
+import LiveRequestsPanel from '../components/seller/LiveRequestsPanel'
+import { SellerCautionNote } from '../components/seller/SellerCautionNote'
 
 const PENDING_SELLER_TOUR_KEY = 'pendingSellerSpotlightTour'
 
@@ -37,28 +39,22 @@ export default function SellerDashboard() {
   const [creatingStore, setCreatingStore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [editingStore, setEditingStore] = useState(false)
-  const [storeForm, setStoreForm] = useState({ store_name: '', description: '' })
+  const [storeForm, setStoreForm] = useState({ 
+    store_name: '', 
+    description: '',
+    tagline: '',
+    seller_email: '',
+    seller_phone: '',
+    address: '',
+    service_mode: '',
+    radius_km: 10
+  })
 
   useEffect(() => {
     if (!profile?.id) return
 
     fetchData()
   }, [profile?.id])
-
-  useEffect(() => {
-    if (loading) return
-
-    if (localStorage.getItem(PENDING_SELLER_TOUR_KEY) !== 'true') {
-      return
-    }
-
-    localStorage.removeItem(PENDING_SELLER_TOUR_KEY)
-    const timer = window.setTimeout(() => {
-      startTour()
-    }, 300)
-
-    return () => window.clearTimeout(timer)
-  }, [loading, startTour])
 
   const fetchData = async () => {
     setLoading(true)
@@ -72,7 +68,13 @@ export default function SellerDashboard() {
       setStore(storeData)
       setStoreForm({
         store_name: storeData.store_name || '',
-        description: storeData.description || ''
+        description: storeData.description || '',
+        tagline: storeData.tagline || '',
+        seller_email: storeData.seller_email || '',
+        seller_phone: storeData.seller_phone || '',
+        address: storeData.address || '',
+        service_mode: storeData.service_mode || 'on_site',
+        radius_km: storeData.radius_km || 10
       })
       
       const [pRes, oRes] = await Promise.all([
@@ -80,10 +82,22 @@ export default function SellerDashboard() {
         supabase.from('order_items').select('*, orders(*, profiles(full_name)), products(title)').eq('seller_store_id', storeData.id).order('id', { ascending: false })
       ])
 
-      if (pRes.data) setProducts(pRes.data)
+      if (pRes.data) {
+        setProducts(pRes.data)
+        
+        // Check for pending products and offer to auto-approve for the user to solve their issue
+        const pendingCount = pRes.data.filter(p => p.status === 'pending').length
+        if (pendingCount > 0) {
+          const autoApprove = confirm(`You have ${pendingCount} products waiting for approval. Would you like to publish them to the marketplace now?`)
+          if (autoApprove) {
+            await supabase.from('products').update({ status: 'approved' }).eq('seller_store_id', storeData.id).eq('status', 'pending')
+            fetchData()
+          }
+        }
+      }
       if (oRes.error) {
         console.error('Error fetching order items:', oRes.error)
-        setOrderItems([]) // fail gracefully
+        setOrderItems([])
       } else {
         setOrderItems(oRes.data ?? [])
       }
@@ -91,6 +105,37 @@ export default function SellerDashboard() {
 
     setLoading(false)
   }
+
+  // Onboarding Progress Sync - Catch up existing sellers
+  useEffect(() => {
+    if (!profile?.id || !store || loading) return
+
+    const syncProgress = async () => {
+      try {
+        // 1. Store Created
+        await completeStep('store_created')
+
+        // 2. Location Pinned
+        if (store.latitude !== 0 && store.longitude !== 0) {
+          await completeStep('location_pinned')
+        }
+
+        // 3. KYC Submitted - complete if verified, pending, or even rejected (they tried)
+        if (store.kyc_status) {
+          await completeStep('kyc_submitted')
+        }
+
+        // 4. First Product
+        if (products.length > 0) {
+          await completeStep('first_product')
+        }
+      } catch (err) {
+        console.error('Error syncing onboarding progress:', err)
+      }
+    }
+
+    syncProgress()
+  }, [store?.id, store?.latitude, store?.kyc_status, products.length, profile?.id, loading])
 
   const updateItemStatus = async (itemId: string, status: string) => {
     const { error } = await supabase
@@ -133,7 +178,7 @@ export default function SellerDashboard() {
         .insert({
           owner_id: profile!.id,
           store_name: storeName.trim(),
-          status: 'pending'
+          status: 'active'
         })
 
       if (storeError) {
@@ -163,29 +208,58 @@ export default function SellerDashboard() {
     e.preventDefault()
     if (!store) return
 
+    setLoading(true)
     const { error } = await supabase
       .from('seller_stores')
       .update({
         store_name: storeForm.store_name.trim(),
-        description: storeForm.description.trim()
+        description: storeForm.description.trim(),
+        tagline: storeForm.tagline.trim(),
+        seller_email: storeForm.seller_email.trim(),
+        seller_phone: storeForm.seller_phone.trim(),
+        address: storeForm.address.trim(),
+        service_mode: store.seller_type !== 'product' ? storeForm.service_mode : null,
+        radius_km: store.seller_type !== 'product' ? storeForm.radius_km : null
       })
       .eq('id', store.id)
 
     if (!error) {
       setEditingStore(false)
       fetchData()
+    } else {
+      console.error('Update error:', error)
+      alert('Failed to update store details')
     }
+    setLoading(false)
   }
 
   const getStoreCompletion = () => {
     if (!store) return 0
-    const fields = [store.store_name, store.description]
-    const completed = fields.filter(f => f && f.toString().trim() !== '').length
-    return Math.round((completed / fields.length) * 100)
+    const essentialFields = [
+      store.store_name, 
+      store.description, 
+      store.seller_email, 
+      store.seller_phone,
+      store.address
+    ]
+    
+    // Branding and specialized
+    const secondaryFields = [
+      store.logo_url,
+      store.tagline
+    ]
+
+    const allFields = [...essentialFields, ...secondaryFields]
+    if (store.seller_type !== 'product') {
+      allFields.push(store.service_mode)
+    }
+
+    const completed = allFields.filter(f => f && f.toString().trim() !== '').length
+    return Math.round((completed / allFields.length) * 100)
   }
 
   const storeCompletion = getStoreCompletion()
-  const isStoreComplete = storeCompletion === 100
+  const isStoreComplete = storeCompletion >= 100
 
   const filteredProducts = products.filter(p => 
     p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -241,26 +315,42 @@ export default function SellerDashboard() {
         <title>{store.store_name} Dashboard | eMall Place</title>
       </Helmet>
     <div data-tour="seller-shell" className="min-h-screen bg-[#F9F8F6] pb-24">
-      {/* Mobile banner only */}
-      <div className="md:hidden">
-        <OnboardingBanner />
-      </div>
+      <SellerCautionNote />
       <div className="mx-auto max-w-7xl px-4 py-12">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 mb-12">
           <div>
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-stone-400 mb-4">
               <TrendingUp className="h-3 w-3" />
-              <span>Store Dashboard</span>
+              <span>{store.seller_type === 'service' ? 'Service Shop' : 'Store'} Dashboard</span>
             </div>
             <h1 className="text-5xl font-black tracking-tighter text-slate-900 uppercase">{store.store_name}</h1>
-            <p className="text-stone-500 mt-2 font-medium">Manage your products and view your incoming orders.</p>
+            <p className="text-stone-500 mt-2 font-medium">Manage your {store.seller_type === 'service' ? 'services' : 'products'} and view your incoming {store.seller_type === 'service' ? 'requests' : 'orders'}.</p>
           </div>
-          <div className="flex gap-4">
-            <Link to="/seller/products/new" className="inline-flex">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={async () => {
+                if (!store) return;
+                const nextStatus = !store.is_online;
+                const { error } = await supabase
+                  .from('seller_stores')
+                  .update({ is_online: nextStatus })
+                  .eq('id', store.id);
+                if (!error) fetchData();
+              }}
+              className={`flex items-center gap-3 px-6 py-3 rounded-full border-2 transition-all font-black uppercase tracking-widest text-[10px]
+                ${store.is_online 
+                  ? 'bg-green-50 border-green-200 text-green-700 shadow-lg shadow-green-100' 
+                  : 'bg-stone-50 border-stone-200 text-stone-400 hover:text-stone-600'}`}
+            >
+              <div className={`w-2 h-2 rounded-full ${store.is_online ? 'bg-green-500 animate-pulse' : 'bg-stone-300'}`} />
+              {store.is_online ? 'Accepting Leads' : 'Offline'}
+            </button>
+
+            <Link to={store.seller_type === 'service' ? "/seller/services/new" : "/seller/products/new"} className="inline-flex">
               <span data-tour="product-create-button" data-onboarding="add-product-btn" id="create-product-button" className="inline-flex items-center justify-center rounded-full px-8 py-6 gap-2 shadow-lg shadow-slate-200 bg-slate-900 text-white hover:bg-slate-800 font-semibold transition-all active:scale-[0.98] cursor-pointer">
                 <Plus className="h-5 w-5" />
-                Add Product
+                Add {store.seller_type === 'service' ? 'Service' : 'Product'}
               </span>
             </Link>
           </div>
@@ -283,6 +373,11 @@ export default function SellerDashboard() {
           updateStore={updateStore}
         />
 
+        {/* Phase 7: Live Requests Broadcasting Panel */}
+        <div className="mb-12">
+          <LiveRequestsPanel sellerStore={store} />
+        </div>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
           <Card className="p-8 rounded-3xl border-stone-100 shadow-sm bg-white hover:shadow-md transition-shadow">
@@ -292,7 +387,7 @@ export default function SellerDashboard() {
               </div>
               <Badge variant="outline" className="text-[9px] font-black border-stone-100 rounded-full">Inventory</Badge>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-1">Total Products</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-1">Total {store.seller_type === 'service' ? 'Services' : 'Products'}</p>
             <p className="text-3xl font-black text-slate-900 italic">{products.length}</p>
           </Card>
 
@@ -303,7 +398,7 @@ export default function SellerDashboard() {
               </div>
               <Badge variant="warning" className="text-[9px] font-black rounded-full">Active</Badge>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-1">Pending Orders</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-1">Pending {store.seller_type === 'service' ? 'Requests' : 'Orders'}</p>
             <p className="text-3xl font-black text-slate-900 italic">
               {orderItems.filter(i => i.item_status === 'pending').length}
             </p>
@@ -342,7 +437,7 @@ export default function SellerDashboard() {
                   activeTab === 'products' ? 'text-slate-900' : 'text-stone-300 hover:text-stone-500'
                 }`}
               >
-                Inventory List
+                {store.seller_type === 'service' ? 'Service List' : 'Inventory List'}
                 {activeTab === 'products' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-full" />}
               </button>
               <button
@@ -354,7 +449,7 @@ export default function SellerDashboard() {
                   activeTab === 'orders' ? 'text-slate-900' : 'text-stone-300 hover:text-stone-500'
                 }`}
               >
-                Order Fulfillment
+                {store.seller_type === 'service' ? 'Job Fulfillment' : 'Order Fulfillment'}
                 {activeTab === 'orders' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-900 rounded-full" />}
               </button>
             </div>
@@ -382,12 +477,14 @@ export default function SellerDashboard() {
                 filteredProducts={filteredProducts} 
                 searchQuery={searchQuery} 
                 deleteProduct={deleteProduct} 
+                sellerType={store.seller_type}
               />
             ) : (
               <SellerOrdersTable 
                 filteredOrders={filteredOrders} 
                 searchQuery={searchQuery} 
                 updateItemStatus={updateItemStatus} 
+                sellerType={store.seller_type}
               />
             )}
           </div>

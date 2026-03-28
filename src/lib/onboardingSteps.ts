@@ -37,6 +37,27 @@ export const SELLER_STEPS: OnboardingStep[] = [
     selector: '[data-onboarding="store-name"]'
   },
   {
+    id: 'location_pinned',
+    title: 'Pin Your Location',
+    description: 'Mark your store on the map so buyers can find you nearby.',
+    page: '/seller',
+    actionLabel: 'Set Pin',
+    actionPath: '/seller',
+    mandatory: true,
+    role: 'seller',
+    selector: '[data-tour="seller-shell"]'
+  },
+  {
+    id: 'kyc_submitted',
+    title: 'Identity Verification',
+    description: 'Submit your KYC documents to build trust and enable payouts.',
+    page: '/seller/onboarding',
+    actionLabel: 'Verify Now',
+    actionPath: '/seller/onboarding',
+    mandatory: true,
+    role: 'seller'
+  },
+  {
     id: 'first_product',
     title: 'Add Your First Product',
     description: 'Showcase your first craft item to potential customers.',
