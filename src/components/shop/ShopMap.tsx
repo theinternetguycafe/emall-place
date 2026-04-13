@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X, ShoppingBag, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { getStoreLogo } from "../../lib/storeUtils";
 
 export default function ShopMap({ products, userLocation }: any) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const [selectedStore, setSelectedStore] = useState<any>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
 
   // Group products by store
   const stores = React.useMemo(() => {
@@ -33,6 +35,7 @@ export default function ShopMap({ products, userLocation }: any) {
     if (isPlaceholder || !mapContainerRef.current || mapInstance.current) return;
 
     import("mapbox-gl").then((mapboxgl: any) => {
+      if (!mapContainerRef.current) return;
       mapboxgl.default.accessToken = MAPBOX_TOKEN;
       const map = new mapboxgl.default.Map({
         container: mapContainerRef.current!,
@@ -42,6 +45,9 @@ export default function ShopMap({ products, userLocation }: any) {
         pitch: 0,
         antialias: true
       });
+
+      mapInstance.current = map;
+      setIsMapReady(true);
 
       map.on('load', () => {
         map.addSource('stores', {
@@ -79,7 +85,7 @@ export default function ShopMap({ products, userLocation }: any) {
 
   useEffect(() => {
     const map = mapInstance.current;
-    if (!map) return;
+    if (!map || !isMapReady) return;
 
     // Heatmap update logic
     const updateHeatmap = () => {
@@ -124,11 +130,8 @@ export default function ShopMap({ products, userLocation }: any) {
             ${isSelected ? 'border-slate-900 scale-125 z-50' : 'border-stone-100 hover:scale-110'}`;
           
           el.innerHTML = `
-            <div class="w-10 h-10 rounded-full overflow-hidden bg-stone-50 flex items-center justify-center relative">
-              ${store.logo_url 
-                ? `<img src="${store.logo_url}" class="w-full h-full object-cover" />`
-                : `<span class="text-[10px] font-black text-slate-400">${store.store_name.substring(0,2).toUpperCase()}</span>`
-              }
+            <div class="w-10 h-10 rounded-full overflow-hidden bg-stone-50 flex items-center justify-center relative border border-stone-100">
+              <img src="${getStoreLogo(store.store_name, store.logo_url)}" class="w-full h-full object-cover" />
               <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${isLive ? 'bg-green-500 animate-pulse' : 'bg-stone-300'}"></div>
             </div>
             ${isLive ? '<div class="absolute -inset-1 rounded-full border-2 border-green-500/20 animate-ping" style="animation-duration: 3s;"></div>' : ''}
@@ -157,7 +160,7 @@ export default function ShopMap({ products, userLocation }: any) {
         map.fitBounds(bounds, { padding: 80, maxZoom: 14 });
       }
     });
-  }, [stores, userLocation, selectedStore]);
+  }, [stores, userLocation, selectedStore, isMapReady]);
 
   return (
     <div className="h-full w-full relative">
@@ -169,11 +172,7 @@ export default function ShopMap({ products, userLocation }: any) {
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-stone-50 overflow-hidden border border-stone-100 flex items-center justify-center">
-                  {selectedStore.logo_url ? (
-                    <img src={selectedStore.logo_url} className="w-full h-full object-cover" />
-                  ) : (
-                    <ShoppingBag className="text-stone-300" />
-                  )}
+                  <img src={getStoreLogo(selectedStore.store_name, selectedStore.logo_url)} className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <h3 className="text-xl font-black text-slate-900 tracking-tighter uppercase leading-none mb-1">{selectedStore.store_name}</h3>

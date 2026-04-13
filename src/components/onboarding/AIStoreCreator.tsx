@@ -45,18 +45,21 @@ export function AIStoreCreator({ onStoreCreated }: AIStoreCreatorProps) {
     setError(null)
 
     try {
-      const { error: storeError } = await supabase
-        .from('seller_stores')
-        .insert({
-          owner_id: profile!.id,
-          store_name: storeName.trim(),
-          description: storeDescription.trim(),
-          status: 'pending'
-        })
+      // Upsert into seller_profiles (identity)
+      const { data: spData, error: spError } = await supabase
+        .from('seller_profiles')
+        .upsert({ user_id: profile!.id, store_name: storeName.trim(), status: 'pending' }, { onConflict: 'user_id' })
+        .select('id')
+        .single()
 
-      if (storeError) {
-        throw new Error(`Failed to create store: ${storeError.message}`)
-      }
+      if (spError) throw new Error(`Failed to create seller profile: ${spError.message}`)
+
+      // Upsert into stores (presentation)
+      const { error: storeError } = await supabase
+        .from('stores')
+        .upsert({ seller_id: spData.id, description: storeDescription.trim(), is_verified: false }, { onConflict: 'seller_id' })
+
+      if (storeError) throw new Error(`Failed to create store: ${storeError.message}`)
 
       // Mark step as complete
       try {

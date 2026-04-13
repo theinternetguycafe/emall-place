@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import React, { useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Order } from '../types'
 import { Package, ChevronRight, Clock, ExternalLink, Calendar, Receipt } from 'lucide-react'
@@ -9,54 +8,22 @@ import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
 import { Skeleton } from '../components/ui/Skeleton'
+import { useOrders } from '../hooks/useOrders'
 
 export default function Orders() {
   const { user } = useAuth()
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { orders, loading, error, refetch } = useOrders(user?.id)
 
   useEffect(() => {
-    if (user) {
-      fetchOrders()
-    }
     // Listen for page focus to refresh orders
     const handleFocus = () => {
-      if (user) fetchOrders()
+      refetch()
     }
     window.addEventListener('focus', handleFocus)
     return () => {
       window.removeEventListener('focus', handleFocus)
     }
-  }, [user])
-
-  const fetchOrders = async () => {
-    setLoading(true)
-    try {
-      const { data, error: oError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (
-            *,
-            product:product_id (
-              title,
-              product_images (url)
-            )
-          )
-        `)
-        .eq('buyer_id', user?.id)
-        .order('created_at', { ascending: false })
-
-      if (oError) throw oError
-      setOrders(data || [])
-    } catch (err: any) {
-      console.error('Error fetching orders:', err)
-      setError('Failed to load your orders. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [refetch])
 
   const getStatusVariant = (status: string, paymentStatus: string) => {
     // If payment is pending/unpaid, show as outline
@@ -141,7 +108,7 @@ export default function Orders() {
               <h1 className="text-5xl font-black tracking-tighter text-slate-900 uppercase">Your Orders</h1>
               <p className="text-stone-500 mt-2 font-medium">View and track your purchases.</p>
             </div>
-            <Link to="/shop">
+            <Link to="/marketplace">
               <Button variant="outline" className="rounded-full border-stone-200">
                 Continue Shopping
               </Button>
@@ -158,7 +125,7 @@ export default function Orders() {
             </div>
             <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">No Orders Yet</h3>
             <p className="text-stone-500 mt-2 max-w-xs mx-auto">Start shopping to see your orders here.</p>
-            <Link to="/shop" className="mt-10 inline-block">
+            <Link to="/marketplace" className="mt-10 inline-block">
               <Button size="lg" className="rounded-2xl px-12 shadow-xl shadow-slate-200">
                 Start Shopping
               </Button>

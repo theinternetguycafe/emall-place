@@ -13,6 +13,45 @@ export interface Profile {
   created_at: string
 }
 
+export interface SellerProfile {
+  id: string
+  user_id: string
+  seller_type: 'product' | 'service' | 'both'
+  onboarding_completed: boolean
+  store_name: string | null
+  store_slug: string | null
+  kyc_status: 'not_started' | 'pending' | 'approved' | 'rejected'
+  is_online: boolean
+  latitude: number | null
+  longitude: number | null
+  address: string | null
+  seller_email: string | null
+  seller_phone: string | null
+  rating_avg: number
+  rating_count: number
+  service_mode: 'on_site' | 'in_house' | 'both' | null
+  radius_km: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Store {
+  id: string
+  seller_id: string
+  banner_url: string | null
+  logo_url: string | null
+  tagline: string | null
+  description: string | null
+  theme_color: string | null
+  announcement_text: string | null
+  store_policies: StorePolicies | null
+  featured_product_ids: string[] | null
+  is_verified: boolean
+  is_featured: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface Category {
   id: string
   name: string
@@ -20,9 +59,32 @@ export interface Category {
   image_url?: string | null
 }
 
+export interface Service {
+  id: string
+  seller_id: string
+  title: string
+  description: string | null
+  base_rate: number
+  category_id: string | null
+  is_active: boolean
+  status: 'pending' | 'approved' | 'hidden'
+  created_at: string
+  updated_at: string
+}
+
+export interface ServiceLocation {
+  id: string
+  service_id: string
+  latitude: number
+  longitude: number
+  coverage_radius_km: number
+  created_at: string
+}
+
 export interface Product {
   id: string
-  seller_store_id: string
+  seller_id?: string // New relationship
+  seller_store_id?: string // Legacy relationship
   category_id: string | null
   title: string
   description: string | null
@@ -36,10 +98,12 @@ export interface Product {
   sale_label?: string | null
   created_at: string
   category?: Category
-  seller_store?: SellerStore
+  seller_store?: SellerStore // Legacy
+  seller_profile?: SellerProfile // New
   product_images?: ProductImage[]
 }
 
+// Keeping this around until migration is entirely verified to prevent build errors
 export interface SellerStore {
   id: string
   owner_id: string
@@ -100,7 +164,8 @@ export interface Order {
 export interface OrderItem {
   id: string
   order_id: string
-  seller_store_id: string | null
+  seller_id?: string // New relationship
+  seller_store_id?: string | null // Legacy relationship
   product_id: string | null
   qty: number
   unit_price: number
@@ -108,7 +173,8 @@ export interface OrderItem {
   commission_amount: number
   item_status: 'pending' | 'packed' | 'shipped' | 'delivered' | 'cancelled'
   product?: Product
-  seller_store?: SellerStore
+  seller_store?: SellerStore // Legacy
+  seller_profile?: SellerProfile // New
 }
 
 export type ServiceRequestStatus = 'broadcasting' | 'accepted' | 'in_progress' | 'completed' | 'expired'
@@ -126,4 +192,18 @@ export interface ServiceRequest {
   assigned_seller_id?: string | null
   expires_at: string
   created_at: string
+}
+
+export interface StoreReview {
+  id: string
+  seller_id?: string // New relationship
+  store_id?: string // Legacy relationship
+  reviewer_id: string
+  rating: number
+  comment: string | null
+  created_at: string
+  updated_at: string
+  profiles?: {
+    full_name: string | null
+  }
 }

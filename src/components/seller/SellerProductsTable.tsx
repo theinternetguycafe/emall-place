@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Edit2, Trash2, Package } from 'lucide-react'
+import { Edit2, Trash2, Package, Eye, EyeOff } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
 import ProductImage from '../ProductImage'
@@ -9,6 +9,8 @@ interface SellerProductsTableProps {
   filteredProducts: Product[]
   searchQuery: string
   deleteProduct: (id: string) => Promise<void>
+  toggleProductVisibility: (p: Product) => Promise<void>
+  setEditingProduct: (p: Product) => void
   sellerType?: 'product' | 'service' | 'both'
 }
 
@@ -16,70 +18,119 @@ export function SellerProductsTable({
   filteredProducts,
   searchQuery,
   deleteProduct,
+  toggleProductVisibility,
+  setEditingProduct,
   sellerType
 }: SellerProductsTableProps) {
   return (
     <table className="w-full min-w-[800px] text-left">
-      <thead>
-        <tr className="bg-stone-50/50">
-          <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">{sellerType === 'service' ? 'Service Details' : 'Product Details'}</th>
-          <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Price</th>
-          <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Stock</th>
-          <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-stone-400">Status</th>
-          <th className="px-8 py-4 text-right text-[10px] font-black uppercase tracking-widest text-stone-400">Actions</th>
+      <thead className="bg-stone-50 border-b border-stone-100">
+        <tr>
+          {(sellerType === 'service' 
+            ? ['Service Details', 'Base Rate', 'Status', 'Actions'] 
+            : sellerType === 'both' 
+              ? ['Item Details', 'Type', 'Price', 'Stock', 'Status', 'Sale', 'Actions'] 
+              : ['Product Details', 'Price', 'Stock', 'Status', 'Sale', 'Actions']
+          ).map(h => (
+            <th key={h} className="px-8 py-4 text-left text-[10px] font-black uppercase tracking-widest text-stone-400">
+              {h}
+            </th>
+          ))}
         </tr>
       </thead>
       <tbody className="divide-y divide-stone-50 bg-white">
-        {filteredProducts.map((product) => (
-          <tr key={product.id} className="group hover:bg-stone-50/30 transition-colors">
-            <td className="px-8 py-6">
-              <div className="flex items-center gap-4">
-                <div className="h-16 w-16 flex-shrink-0 bg-stone-100 rounded-2xl overflow-hidden border border-stone-200">
-                  {product.product_images?.[0] && (
-                    <ProductImage 
-                      src={product.product_images[0].url} 
-                      className="h-full w-full object-cover" 
-                      alt=""
-                      transformOptions={{ width: 80, quality: 75, format: 'webp' }}
-                    />
-                  )}
+        {filteredProducts.map((product) => {
+          const itemIsService = sellerType === 'both' ? (product.stock ?? 0) >= 999 : sellerType === 'service'
+          return (
+            <tr key={product.id} className="group hover:bg-stone-50/30 transition-colors">
+              <td className="px-8 py-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 flex-shrink-0 bg-stone-100 rounded-2xl overflow-hidden border border-stone-200 flex items-center justify-center">
+                    {(product as any).product_images?.[0] ? (
+                      <ProductImage 
+                        src={(product as any).product_images[0].url} 
+                        className="h-full w-full object-cover" 
+                        alt=""
+                        transformOptions={{ width: 80, quality: 75, format: 'webp' }}
+                      />
+                    ) : (
+                      <Package className="h-6 w-6 text-stone-300" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-slate-900 group-hover:text-stone-600 transition-colors max-w-[180px] truncate">{product.title}</div>
+                    <div className="text-[10px] text-stone-400 font-mono mt-1 uppercase tracking-tighter">ID: {product.id.slice(0, 8)}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm font-bold text-slate-900 group-hover:text-stone-600 transition-colors">{product.title}</div>
-                  <div className="text-[10px] text-stone-400 font-mono mt-1 uppercase tracking-tighter">ID: {product.id.slice(0, 8)}</div>
-                </div>
-              </div>
-            </td>
-            <td className="px-8 py-6 text-sm font-black text-slate-900">
-              R {product.price.toLocaleString()}
-            </td>
-            <td className="px-8 py-6">
-              <span className={`text-sm font-bold ${product.stock < 5 ? 'text-rose-600' : 'text-slate-600'}`}>
-                {product.stock} units
-              </span>
-            </td>
-            <td className="px-8 py-6">
-              <Badge variant={product.status === 'approved' ? 'success' : product.status === 'pending' ? 'warning' : 'error'} className="text-[9px] font-black uppercase rounded-full">
-                {product.status}
-              </Badge>
-            </td>
-            <td className="px-8 py-6 text-right">
-              <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Link to={sellerType === 'service' ? `/seller/services/${product.id}/edit` : `/seller/products/${product.id}/edit`} className="inline-flex">
-                  <span className="inline-flex items-center justify-center h-10 w-10 p-0 rounded-xl text-stone-400 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer">
-                    <Edit2 className="h-4 w-4" />
+              </td>
+              
+              {sellerType === 'both' && (
+                <td className="px-8 py-6">
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    itemIsService ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {itemIsService ? '⚡ Service' : '📦 Product'}
                   </span>
-                </Link>
-                <Button onClick={() => deleteProduct(product.id)} variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-xl text-stone-400 hover:text-rose-600">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </td>
-          </tr>
-        ))}
+                </td>
+              )}
+
+              <td className="px-8 py-6 text-sm font-black text-slate-900">
+                R {product.price.toLocaleString()}
+              </td>
+              
+              {!itemIsService && (
+                <td className="px-8 py-6">
+                  <span className={`text-sm font-bold ${product.stock === 0 ? 'text-red-500' : product.stock <= 5 ? 'text-amber-500' : 'text-emerald-600'}`}>
+                    {product.stock} units
+                  </span>
+                </td>
+              )}
+              {itemIsService && sellerType === 'both' && (
+                <td className="px-8 py-6">
+                  <span className="text-stone-300 text-sm font-black">∞</span>
+                </td>
+              )}
+
+              <td className="px-8 py-6">
+                <Badge variant={product.status === 'approved' ? 'success' : product.status === 'pending' ? 'warning' : 'error'} className="text-[9px] font-black uppercase rounded-full">
+                  {product.status}
+                </Badge>
+              </td>
+
+              {!itemIsService && (
+                <td className="px-8 py-6">
+                  {product.is_on_sale ? (
+                    <Badge variant="warning" className="rounded-full text-[9px] font-black">ON SALE</Badge>
+                  ) : (
+                    <span className="text-stone-300 text-sm">—</span>
+                  )}
+                </td>
+              )}
+              {itemIsService && sellerType === 'both' && (
+                <td className="px-8 py-6">
+                  <span className="text-stone-300 text-sm">—</span>
+                </td>
+              )}
+
+              <td className="px-8 py-6 text-right">
+                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button size="sm" variant="ghost" className="h-10 w-10 p-0 rounded-xl text-stone-400 hover:text-slate-900 hover:bg-slate-100 transition-colors" onClick={() => setEditingProduct(product)}>
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className={`h-10 w-10 p-0 rounded-xl ${product.status === 'approved' ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'}`} onClick={() => toggleProductVisibility(product)}>
+                    {product.status === 'approved' ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-10 w-10 p-0 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => deleteProduct(product.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          )
+        })}
         {filteredProducts.length === 0 && (
           <tr>
-            <td colSpan={5} className="px-8 py-24 text-center">
+            <td colSpan={sellerType === 'both' ? 7 : 6} className="px-8 py-24 text-center">
                {searchQuery ? (
                  <div className="max-w-xs mx-auto text-center">
                     <Package className="h-12 w-12 text-stone-200 mx-auto mb-4" />

@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
       // Now check if a payment record exists for this order
       const { data: existingPayment, error: fetchErr } = await admin
         .from("payments")
-        .select("id, provider_reference, order_id, status")
+        .select("id, payment_reference, order_id, status")
         .eq("order_id", externalId)
         .maybeSingle();
 
@@ -129,16 +129,16 @@ Deno.serve(async (req) => {
       // If no payment row exists, create it
       if (!existingPayment) {
         console.log("[yoco-webhook] Payment row missing, creating one for order:", externalId);
-        
+
         const { error: insertErr } = await admin
           .from("payments")
           .insert({
             order_id: externalId,
-            payment_method: "yoco",
-            provider_reference: finalCheckoutId,
-            status: isPaid ? "paid" : isFailed ? "failed" : isCancelled ? "cancelled" : "pending",
-            amount: 0, // Will be fetched from order if needed
-            metadata: { created_by: "webhook" },
+            provider: "yoco",
+            payment_reference: finalCheckoutId,
+            status: isPaid ? "completed" : isFailed ? "failed" : isCancelled ? "failed" : "pending",
+            amount: 0,
+            currency: "ZAR",
           });
 
         if (insertErr) {
@@ -150,21 +150,21 @@ Deno.serve(async (req) => {
         }
 
         console.log("[yoco-webhook] Payment row created, continuing with status update");
-      } else if (existingPayment.provider_reference && existingPayment.provider_reference !== finalCheckoutId) {
-        // CheckoutId mismatch - log loudly but return 200 to prevent retry spam
+      } else if (existingPayment.payment_reference && existingPayment.payment_reference !== finalCheckoutId) {
+        // CheckoutId mismatch
         console.error("[yoco-webhook] CheckoutId mismatch - potential fraud or double-webhook", {
           finalCheckoutId,
-          existing: existingPayment.provider_reference,
+          existing: existingPayment.payment_reference,
           externalId,
           incomingStatus: statusLower,
         });
-        
+
         return new Response(
           JSON.stringify({ success: true, ignored: true, reason: "checkoutId_mismatch" }),
           { status: 200 }
         );
       } else {
-        console.log("[yoco-webhook] Checkout ID verified - matches payment record for order:", externalId);
+        console.log("[yoco-webhook] Checkout ID verified for order:", externalId);
       }
     } catch (filterErr) {
       console.error("[yoco-webhook] Error in payment filtering logic:", filterErr);
@@ -183,51 +183,131 @@ Deno.serve(async (req) => {
       console.log("[yoco-webhook] Processing successful payment for order:", externalId);
 
       try {
-        // Update payments table - only update status and provider_reference
+        // Update payments table
         const { error: paymentErr } = await admin
           .from("payments")
           .update({
-            status: "paid",
-            provider_reference: finalCheckoutId,
+            status: "completed",
+            payment_reference: finalCheckoutId,
           })
           .eq("order_id", externalId);
 
         if (paymentErr) {
           console.error("[yoco-webhook] Error updating payments:", paymentErr);
         } else {
-          console.log("[yoco-webhook] Payment record updated for order:", externalId, "checkoutId:", finalCheckoutId);
+          console.log("[yoco-webhook] Payment marked completed for order:", externalId);
         }
 
         // Update orders table
-        const { error: orderErr } = await admin
+        const { data: order, error: orderErr } = await admin
           .from("orders")
           .update({
             payment_status: "paid",
             status: "processing",
+            paid_at: new Date().toISOString(),
           })
-          .eq("id", externalId);
+          .eq("id", externalId)
+          .select("*")
+          .single();
 
         if (orderErr) {
           console.error("[yoco-webhook] Error updating orders:", orderErr);
         } else {
           console.log("[yoco-webhook] Order status updated to processing:", externalId);
         }
+
+        // Log to order_transactions
+        await admin.from("order_transactions").insert({
+          order_id: externalId,
+          event_type: "payment_received",
+          event_description: `Payment received via Yoco (Ref: ${finalCheckoutId})`,
+          actor_type: "system",
+        });
+
+        // 📱 Send buyer WhatsApp notification (if WhatsApp order)
+        const META_ACCESS_TOKEN = Deno.env.get("META_ACCESS_TOKEN");
+        const PHONE_NUMBER_ID = Deno.env.get("META_PHONE_NUMBER_ID");
+
+        if (order?.buyer_phone && META_ACCESS_TOKEN && PHONE_NUMBER_ID) {
+          const buyerMsg = `✅ *Payment Successful!*\nYour order has been confirmed! 🎉\n\n*Order ID:* ${externalId.slice(0, 8).toUpperCase()}\n*Amount Paid:* R${data.amount ? (data.amount / 100).toFixed(2) : order.total_amount}\n\n📦 The seller is preparing your order.`;
+          await sendWhatsAppMessage(order.buyer_phone, buyerMsg, META_ACCESS_TOKEN, PHONE_NUMBER_ID);
+        }
+
+        // 🚚 CREATE DISPATCH REQUEST for delivery orders
+        if (order && order.delivery_mode === "delivery") {
+          console.log("[yoco-webhook] Creating dispatch for order:", externalId);
+
+          // Create delivery record first
+          const { data: delivery, error: deliveryErr } = await admin
+            .from("whatsapp_deliveries")
+            .insert({
+              order_id: externalId,
+              status: "pending",
+              pickup_address: "Seller Store",
+              dropoff_address: order.buyer_phone || "Buyer Address",
+            })
+            .select()
+            .single();
+
+          if (deliveryErr) {
+            console.error("[yoco-webhook] Error creating delivery:", deliveryErr);
+          } else {
+            // Create dispatch request linked to delivery
+            const { data: dispatchReq, error: dispatchErr } = await admin
+              .from("whatsapp_dispatch_requests")
+              .insert({
+                order_id: externalId,
+                delivery_id: delivery.id,
+                status: "waiting",
+                broadcast_count: 0,
+              })
+              .select()
+              .single();
+
+            if (dispatchErr) {
+              console.error("[yoco-webhook] Error creating dispatch request:", dispatchErr);
+            } else {
+              console.log("[yoco-webhook] Dispatch request created:", dispatchReq?.id);
+
+              // 📢 Broadcast to all drivers
+              const { data: drivers } = await admin
+                .from("profiles")
+                .select("phone")
+                .eq("role", "driver");
+
+              if (drivers && drivers.length > 0 && META_ACCESS_TOKEN && PHONE_NUMBER_ID) {
+                const driverMsg = `🚨 *NEW DELIVERY REQUEST!*\n\n📦 Order: ${externalId.slice(0, 8).toUpperCase()}\n💰 Amount: R${order.total_amount}\n\n1️⃣ Accept\n2️⃣ Skip`;
+                for (const driver of drivers) {
+                  await sendWhatsAppMessage(driver.phone, driverMsg, META_ACCESS_TOKEN, PHONE_NUMBER_ID);
+                }
+                console.log("[yoco-webhook] Broadcast to", drivers.length, "drivers");
+              }
+
+              // Log dispatch event
+              await admin.from("whatsapp_system_logs").insert({
+                log_type: "other",
+                reference_id: externalId,
+                reference_type: "order",
+                actor_type: "bot",
+                message: `Dispatch request created and broadcasted to drivers`,
+              });
+            }
+          }
+        }
       } catch (dbErr) {
         console.error("[yoco-webhook] Database error:", dbErr);
-        // Still return 200 to prevent Yoco retry loop
       }
     } else if (isFailed || isCancelled) {
       console.log("[yoco-webhook] Processing failed/cancelled payment - status:", statusLower, "order:", externalId);
 
       try {
-        const paymentStatus = isFailed ? "failed" : "cancelled";
+        const paymentStatus = "failed"; // both failed & cancelled map to 'failed'
 
-        // Update payments table - only update status and provider_reference
         const { error: paymentErr } = await admin
           .from("payments")
           .update({
             status: paymentStatus,
-            provider_reference: finalCheckoutId,
+            payment_reference: finalCheckoutId,
           })
           .eq("order_id", externalId);
 
@@ -237,7 +317,6 @@ Deno.serve(async (req) => {
           console.log("[yoco-webhook] Payment marked as", paymentStatus, "for order:", externalId);
         }
 
-        // Update orders table
         const { error: orderErr } = await admin
           .from("orders")
           .update({
@@ -249,7 +328,7 @@ Deno.serve(async (req) => {
         if (orderErr) {
           console.error("[yoco-webhook] Error updating order status:", orderErr);
         } else {
-          console.log("[yoco-webhook] Order payment status and status updated to cancelled:", externalId);
+          console.log("[yoco-webhook] Order marked cancelled:", externalId);
         }
       } catch (dbErr) {
         console.error("[yoco-webhook] Database error:", dbErr);
@@ -329,4 +408,38 @@ function constantTimeCompare(a: string, b: string): boolean {
     result |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
   return result === 0;
+}
+
+// Send WhatsApp message via Meta API
+async function sendWhatsAppMessage(
+  to: string,
+  message: string,
+  accessToken: string,
+  phoneNumberId: string
+): Promise<void> {
+  try {
+    const url = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: to,
+        type: "text",
+        text: { body: message },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`[WHATSAPP ERROR] ${response.status}: ${error}`);
+    } else {
+      console.log(`[WHATSAPP] ✓ Sent to ${to}`);
+    }
+  } catch (err: any) {
+    console.error(`[WHATSAPP SEND ERROR]`, err.message);
+  }
 }

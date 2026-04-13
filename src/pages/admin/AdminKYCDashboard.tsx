@@ -9,7 +9,7 @@ interface KYCSubmission {
   id_number: string;
   document_url: string;
   selfie_url: string;
-  status: 'pending' | 'verified' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   profiles: {
     full_name: string;
@@ -20,6 +20,8 @@ interface KYCSubmission {
 export default function AdminKYCDashboard() {
   const [submissions, setSubmissions] = useState<KYCSubmission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [dbRole, setDbRole] = useState<string | null>(null);
   const [selectedSub, setSelectedSub] = useState<KYCSubmission | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
@@ -30,28 +32,71 @@ export default function AdminKYCDashboard() {
   const fetchSubmissions = async () => {
     try {
       setLoading(true);
-      // Fetch submissions with profile data joined
-      const { data, error } = await supabase
+
+      // 0. Verify actual DB role
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        if (prof) setDbRole(prof.role);
+      }
+
+      const { data: kycData, error: kycError } = await supabase
         .from('kyc_submissions')
-        .select(`
-          *,
-          profiles:user_id (
-            full_name,
-            email
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setSubmissions(data || []);
-    } catch (err) {
+      if (kycError) throw kycError;
+      
+      if (!kycData || kycData.length === 0) {
+        setSubmissions([]);
+        return;
+      }
+
+      const userIds = [...new Set(kycData.map((k: any) => k.user_id))];
+      
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+        
+      if (profilesError) {
+        console.error('Profiles fetch error:', profilesError);
+      }
+
+      const profileMap = (profilesData || []).reduce((acc: any, p: any) => {
+        acc[p.id] = { full_name: p.full_name };
+        return acc;
+      }, {});
+
+      const getSigned = async (url: string) => {
+        if (!url || !url.includes('/kyc-documents/')) return url;
+        const path = url.split('/kyc-documents/')[1];
+        const { data } = await supabase.storage.from('kyc-documents').createSignedUrl(path, 3600);
+        return data?.signedUrl || url;
+      };
+
+      const mergedSubmissions = await Promise.all(kycData.map(async (k: any) => ({
+        ...k,
+        document_url: await getSigned(k.document_url),
+        selfie_url: await getSigned(k.selfie_url),
+        profiles: profileMap[k.user_id] || null
+      })));
+
+      setSubmissions(mergedSubmissions);
+    } catch (err: any) {
       console.error('Error fetching KYC:', err);
+      // Determine what the error is
+      if (err?.code === '42P01') {
+        setErrorMsg('The kyc_submissions database table does not exist. Please run the FIX_KYC_ADMIN_VISIBILITY.sql script in Supabase.');
+      } else {
+        setErrorMsg(err?.message || 'Failed to load KYC queue from the database.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReview = async (submission: KYCSubmission, status: 'verified' | 'rejected') => {
+  const handleReview = async (submission: KYCSubmission, status: 'approved' | 'rejected') => {
     try {
       setProcessingId(submission.id);
       
@@ -63,18 +108,24 @@ export default function AdminKYCDashboard() {
 
       if (kycError) throw kycError;
 
-      // 2. Update Seller Store status if verified
-      const isVerified = status === 'verified';
-      const { error: storeError } = await supabase
-        .from('seller_stores')
-        .update({ 
-          is_verified: isVerified,
-          kyc_status: status,
-          status: isVerified ? 'active' : 'suspended'
-        })
-        .eq('owner_id', submission.user_id);
+      // 2. Update Seller Profile and Store status if approved
+      const isApproved = status === 'approved';
+      const { data: spData } = await supabase.from('seller_profiles').select('id').eq('user_id', submission.user_id).maybeSingle();
+      
+      if (spData) {
+        await supabase
+          .from('seller_profiles')
+          .update({ 
+            kyc_status: isApproved ? 'approved' : 'rejected',
+            status: isApproved ? 'active' : 'suspended'
+          })
+          .eq('id', spData.id);
 
-      if (storeError) throw storeError;
+        await supabase
+          .from('stores')
+          .update({ is_verified: isApproved })
+          .eq('seller_id', spData.id);
+      }
 
       // 3. Update Profile status? Usually store is the one that matters for permissions.
       
@@ -113,7 +164,14 @@ export default function AdminKYCDashboard() {
               </div>
               <h1 className="text-4xl font-black text-slate-900 tracking-tight">KYC Command Center</h1>
             </div>
-            <p className="text-stone-500 font-medium">Review and verify seller identities to maintain marketplace integrity.</p>
+            <p className="text-stone-500 font-medium flex items-center gap-3">
+              Review and verify seller identities to maintain marketplace integrity.
+              {dbRole && (
+                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${dbRole === 'admin' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  DB Role: {dbRole}
+                </span>
+              )}
+            </p>
           </div>
           
           <div className="flex items-center gap-8 bg-white px-6 py-4 rounded-3xl shadow-sm border border-stone-100">
@@ -124,10 +182,19 @@ export default function AdminKYCDashboard() {
             <div className="w-px h-8 bg-stone-100" />
             <div className="text-center">
               <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-1">Verified</p>
-              <p className="text-2xl font-black text-green-500">{submissions.filter(s => s.status === 'verified').length}</p>
+              <p className="text-2xl font-black text-green-500">{submissions.filter(s => s.status === 'approved').length}</p>
             </div>
           </div>
         </div>
+
+        {errorMsg && (
+          <div className="mb-8 p-6 rounded-2xl bg-red-50 text-red-700 border border-red-200">
+            <p className="font-bold text-lg mb-2 flex items-center gap-2">
+              <XCircle className="h-5 w-5" /> Database Error
+            </p>
+            <p>{errorMsg}</p>
+          </div>
+        )}
 
         {/* Submissions Grid/Table */}
         <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-900/5 overflow-hidden border border-stone-100">
@@ -150,8 +217,12 @@ export default function AdminKYCDashboard() {
                         <UserIcon size={20} />
                       </div>
                       <div>
-                        <p className="font-bold text-slate-900 leading-tight">{sub.profiles?.full_name || 'Unknown User'}</p>
-                        <p className="text-xs text-stone-400 font-medium">{sub.profiles?.email}</p>
+                        <div className="font-bold text-slate-900 leading-tight">
+                          {sub.profiles?.full_name || 'Unknown User'}
+                        </div>
+                        <div className="text-xs text-stone-500 font-medium">
+                          ID: {sub.id_number}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -165,9 +236,9 @@ export default function AdminKYCDashboard() {
                   <td className="px-6 py-6">
                     <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border
                       ${sub.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
-                        sub.status === 'verified' ? 'bg-green-50 text-green-600 border-green-100' : 
+                        sub.status === 'approved' ? 'bg-green-50 text-green-600 border-green-100' : 
                         'bg-red-50 text-red-600 border-red-100'}`}>
-                      {sub.status}
+                      {sub.status === 'approved' ? 'verified' : sub.status}
                     </span>
                   </td>
                   <td className="px-6 py-6 text-right">
@@ -301,7 +372,7 @@ export default function AdminKYCDashboard() {
                 </button>
                 <button 
                   disabled={processingId !== null}
-                  onClick={() => handleReview(selectedSub, 'verified')}
+                  onClick={() => handleReview(selectedSub, 'approved')}
                   className="px-8 py-4 rounded-2xl bg-slate-900 text-white text-sm font-black uppercase tracking-widest hover:bg-black transition-all active:scale-95 shadow-xl shadow-slate-900/20 disabled:opacity-50"
                 >
                   <div className="flex items-center gap-2">

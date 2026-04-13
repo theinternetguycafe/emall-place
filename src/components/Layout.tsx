@@ -5,31 +5,31 @@ import { useCart } from '../contexts/CartContext'
 import { supabase } from '../lib/supabase'
 import { ShoppingCart, User as UserIcon, Store, LogOut, Search, Menu, X, ShieldCheck } from 'lucide-react'
 import { Button } from './ui/Button'
+import NotificationBell from './notifications/NotificationBell'
 
 interface LayoutProps {
   children: React.ReactNode
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, profile, loading, signOut } = useAuth()
+  const { user, profile, sellerProfile, loading, signOut } = useAuth()
   const { itemCount } = useCart()
   const location = useLocation()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
-
   // Global Seller Heartbeat
   React.useEffect(() => {
-    if (profile?.role === 'seller') {
+    if (profile?.role === 'seller' && sellerProfile) {
       const interval = setInterval(async () => {
         try {
           await supabase
-            .from('seller_stores')
-            .update({ last_seen_at: new Date().toISOString() })
-            .eq('owner_id', profile.id);
+            .from('seller_profiles')
+            .update({ is_online: true })
+            .eq('id', sellerProfile.id);
         } catch (err) {}
       }, 30000); // 30s heartbeat is enough for global
       return () => clearInterval(interval);
     }
-  }, [profile]);
+  }, [profile, sellerProfile]);
 
   const isActive = (path: string) => location.pathname === path
 
@@ -68,11 +68,21 @@ export default function Layout({ children }: LayoutProps) {
                 >
                   Marketplace
                 </Link>
+                {profile?.role === 'seller' && sellerProfile?.store_slug && (
+                  <Link 
+                    to={`/store/${sellerProfile.store_slug}`} 
+                    className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
+                      isActive(`/store/${sellerProfile.store_slug}`) ? 'text-emerald-600 bg-emerald-50 border border-emerald-200 shadow-sm' : 'text-stone-400 hover:text-slate-900 hover:bg-stone-50'
+                    }`}
+                  >
+                    My Storefront
+                  </Link>
+                )}
               </div>
             </div>
 
-            {/* Right Actions */}
             <div className="flex items-center space-x-1 md:space-x-2">
+              <NotificationBell />
               <Link to="/cart" className="relative p-3 text-slate-400 hover:text-slate-900 transition-all group">
                 <ShoppingCart className="h-6 w-6 group-hover:-translate-y-0.5 transition-transform" />
                 {itemCount > 0 && (
@@ -87,15 +97,17 @@ export default function Layout({ children }: LayoutProps) {
                   user ? (
                     <div className="flex items-center space-x-3">
                       {profile?.role === 'seller' && (
-                        <Link to="/seller">
-                          <Button variant="outline" size="sm" className="rounded-full border-stone-200 gap-2">
-                            <Store className="h-4 w-4" />
-                            Seller Hub
-                          </Button>
-                        </Link>
+                        <>
+                          <Link to="/seller">
+                            <Button variant="outline" size="sm" className="rounded-full border-stone-200 gap-2">
+                              <Store className="h-4 w-4" />
+                              Seller Hub
+                            </Button>
+                          </Link>
+                        </>
                       )}
                       {profile?.role === 'admin' && (
-                        <Link to="/admin/kyc">
+                        <Link to="/admin">
                           <Button variant="primary" size="sm" className="rounded-full bg-slate-900 px-6">Admin Hub</Button>
                         </Link>
                       )}
@@ -177,7 +189,7 @@ export default function Layout({ children }: LayoutProps) {
                         <Link to="/seller" className="block text-lg font-bold text-stone-500 hover:text-slate-900" onClick={() => setIsMobileMenuOpen(false)}>Seller Hub</Link>
                       )}
                       {profile?.role === 'admin' && (
-                        <Link to="/admin/kyc" className="block text-lg font-bold text-slate-900" onClick={() => setIsMobileMenuOpen(false)}>Admin Management</Link>
+                        <Link to="/admin" className="block text-lg font-bold text-slate-900" onClick={() => setIsMobileMenuOpen(false)}>Admin Management</Link>
                       )}
                       <button onClick={() => { signOut(); setIsMobileMenuOpen(false); }} className="block w-full text-left text-lg font-bold text-rose-600 pt-4">Sign Out</button>
                     </div>
@@ -216,9 +228,9 @@ export default function Layout({ children }: LayoutProps) {
             <div>
               <h4 className="text-white text-[10px] font-black uppercase tracking-[0.3em] mb-8">Experience</h4>
               <ul className="space-y-4 text-xs font-bold">
-                <li><Link to="/shop" className="hover:text-white transition-colors">The Marketplace</Link></li>
-                <li><Link to="/shop?sort=newest" className="hover:text-white transition-colors">New Arrivals</Link></li>
-                <li><Link to="/shop" className="hover:text-white transition-colors">Trending</Link></li>
+                <li><Link to="/marketplace" className="hover:text-white transition-colors">The Marketplace</Link></li>
+                <li><Link to="/marketplace?sort=newest" className="hover:text-white transition-colors">New Arrivals</Link></li>
+                <li><Link to="/marketplace" className="hover:text-white transition-colors">Trending</Link></li>
               </ul>
             </div>
 

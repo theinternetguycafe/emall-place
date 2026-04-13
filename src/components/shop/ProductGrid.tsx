@@ -1,13 +1,17 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { Product } from '../../types'
-import { LayoutGrid, Package, Search, Plus } from 'lucide-react'
+import { LayoutGrid, Package, Search, Plus, Share2 } from 'lucide-react'
 import ProductImage from '../ProductImage'
+import LikeButton from '../ui/LikeButton'
+import { getStoreLogo } from '../../lib/storeUtils'
 import { Card } from '../ui/Card'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Skeleton } from '../ui/Skeleton'
-
+import SaleBadge from '../SaleBadge'
+import ShareSale from '../ShareSale'
+import { getSaleInfo } from '../../utils/saleUtils'
 import { useNavigate } from 'react-router-dom'
 
 interface ProductGridProps {
@@ -28,6 +32,9 @@ export function ProductGrid({
   onClearFilters
 }: ProductGridProps) {
   const navigate = useNavigate()
+  const [selectedProduct, setSelectedProduct] = React.useState<Product | null>(null)
+  const [showShareModal, setShowShareModal] = React.useState(false)
+
   if (loading) {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-12">
@@ -57,66 +64,132 @@ export function ProductGrid({
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-24">
-        {products.map(product => (
-          <div
-            key={product.id}
-            onClick={() => navigate(`/product/${product.id}`)}
-            className="group cursor-pointer flex flex-col"
-          >
-            {/* Image Container */}
-            <div className="relative aspect-[4/5] bg-white rounded-[2.5rem] overflow-hidden mb-8 border border-stone-100 shadow-sm group-hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.12)] transition-all duration-700">
-              {product.product_images?.[0] ? (
-                <ProductImage
-                  src={product.product_images[0].url}
-                  alt={product.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
-                  transformOptions={{ width: 600, quality: 85, format: 'webp' }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-stone-50 text-stone-200">
-                  <Package size={48} />
+        {products.map(product => {
+          const saleInfo = getSaleInfo({
+            price: product.price,
+            is_on_sale: product.is_on_sale || false,
+            sale_price: product.sale_price || null,
+            sale_starts_at: product.sale_starts_at || null,
+            sale_ends_at: product.sale_ends_at || null,
+            sale_label: product.sale_label || null
+          })
+
+          return (
+            <div
+              key={product.id}
+              className="group cursor-pointer flex flex-col"
+            >
+              {/* Image Container */}
+              <div className="relative aspect-[4/5] bg-white rounded-[2.5rem] overflow-hidden mb-8 border border-stone-100 shadow-sm group-hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.12)] transition-all duration-700">
+                <div className="w-full h-full cursor-pointer" onClick={() => navigate(`/product/${product.id}`)}>
+                  {product.product_images?.[0] ? (
+                    <ProductImage
+                      src={product.product_images[0].url}
+                      alt={product.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
+                      transformOptions={{ width: 600, quality: 85, format: 'webp' }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-stone-50 text-stone-200">
+                      <Package size={48} />
+                    </div>
+                  )}
                 </div>
-              )}
-              
-              {/* Overlay for quick info/action */}
-              <div className="absolute inset-0 bg-slate-950/0 group-hover:bg-slate-950/5 transition-colors duration-700" />
-              
-              <div className="absolute top-6 right-6 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
-                <div className="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl text-slate-950">
-                   <Search size={18} />
+                
+                {/* Overlay for quick info/action */}
+                <div className="absolute inset-0 bg-slate-950/0 group-hover:bg-slate-950/5 transition-colors duration-700" />
+                
+                <div className="absolute top-6 right-6 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                  <div className="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl text-slate-950 cursor-pointer" onClick={() => navigate(`/product/${product.id}`)}>
+                     <Search size={18} />
+                  </div>
+                </div>
+
+                {/* Like Button */}
+                <div className="absolute top-6 left-6 z-10">
+                  <LikeButton productId={product.id} size={20} />
+                </div>
+
+                {/* Sale Badge */}
+                {saleInfo.isOnSale && (
+                  <div className="absolute top-6 right-6 -translate-y-16 group-hover:translate-y-0 transition-transform duration-500">
+                    <SaleBadge label={saleInfo.saleLabel || `${saleInfo.discountPercent}% OFF`} />
+                  </div>
+                )}
+              </div>
+
+              {/* Content Container */}
+              <div className="flex flex-col flex-1 px-1">
+                {/* Store Name Badge */}
+                {(product as any).seller_store?.store_name && (
+                  <div className="flex mb-4 items-center gap-2">
+                    <img 
+                      src={getStoreLogo((product as any).seller_store?.store_name, (product as any).seller_store?.logo_url)} 
+                      alt={(product as any).seller_store?.store_name} 
+                      className="w-5 h-5 rounded-full object-cover border border-emerald-100" 
+                    />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full">
+                      {(product as any).seller_store?.store_name}
+                    </span>
+                  </div>
+                )}
+
+                {/* Title */}
+                <h3 className="text-xl font-bold text-slate-900 tracking-tight leading-tight group-hover:text-stone-600 transition-colors duration-300" onClick={() => navigate(`/product/${product.id}`)}>
+                  {product.title}
+                </h3>
+
+                {/* Sale Label */}
+                {saleInfo.isOnSale && saleInfo.saleLabel && (
+                  <p className="text-[10px] font-black uppercase tracking-widest text-red-600 mt-2">
+                    {saleInfo.saleLabel}
+                  </p>
+                )}
+
+                {/* Price & Action Row */}
+                <div className="flex items-center justify-between mt-6 pt-6 border-t border-stone-100">
+                  <div className="flex flex-col gap-1">
+                    <span className={`font-black ${saleInfo.isOnSale ? 'text-red-600 text-2xl' : 'text-slate-900 text-2xl'}`}>
+                      R {saleInfo.displayPrice.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </span>
+                    {saleInfo.isOnSale && (
+                      <span className="text-xs text-stone-400 line-through">
+                        R {saleInfo.originalPrice.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {saleInfo.isOnSale && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedProduct(product)
+                          setShowShareModal(true)
+                        }}
+                        className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all duration-500 shadow-sm hover:shadow-md"
+                      >
+                        <Share2 size={18} />
+                      </button>
+                    )}
+                    <div className="w-12 h-12 rounded-2xl bg-stone-50 flex items-center justify-center text-slate-400 group-hover:bg-slate-950 group-hover:text-white transition-all duration-500 shadow-sm cursor-pointer" onClick={() => navigate(`/product/${product.id}`)}>
+                      <Plus size={20} />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Content Container */}
-            <div className="flex flex-col flex-1 px-1">
-              {/* Store Name Badge */}
-              {(product as any).seller_store?.store_name && (
-                <div className="flex mb-4">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full">
-                    {(product as any).seller_store?.store_name}
-                  </span>
-                </div>
-              )}
-
-              {/* Title */}
-              <h3 className="text-xl font-bold text-slate-900 tracking-tight leading-tight group-hover:text-stone-600 transition-colors duration-300">
-                {product.title}
-              </h3>
-
-              {/* Price & Action Row */}
-              <div className="flex items-center justify-between mt-6 pt-6 border-t border-stone-100">
-                <span className="text-2xl font-black text-slate-900">
-                  R {product.price.toLocaleString('en-ZA')}
-                </span>
-                <div className="w-12 h-12 rounded-2xl bg-stone-50 flex items-center justify-center text-slate-400 group-hover:bg-slate-950 group-hover:text-white transition-all duration-500 shadow-sm">
-                  <Plus size={20} />
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
+
+      {/* Share Modal */}
+      {selectedProduct && (
+        <ShareSale
+          product={selectedProduct}
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
 
       {products.length === 0 && (
         <div className="text-center py-32 bg-white rounded-[2rem] border-2 border-dashed border-slate-100">

@@ -1,305 +1,64 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
-import { User } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
-import { Profile } from '../types'
+/**
+ * AuthContext — Bridge Layer
+ *
+ * The heavy auth logic now lives in useAuthStore (Zustand singleton).
+ * This file remains for two purposes:
+ *   1. AuthProvider: mounts once in App.tsx, calls store.initialize() to start
+ *      the Supabase session + realtime subscription.
+ *   2. useAuth(): backward-compatible hook so all 22 existing consumers
+ *      continue to work with zero changes.
+ *
+ * New code should import from useAuthStore directly.
+ */
+import React, { useEffect, useRef } from 'react'
+import { useAuthStore } from '../store/useAuthStore'
 
-interface AuthContextType {
-  user: User | null
-  profile: Profile | null
-  role: string | null
-  isAuthenticated: boolean
-  isVerified: boolean
-  loading: boolean
-  signOut: () => Promise<void>
-}
+// Re-export types that existing consumers may import from here
+export type { Profile, SellerProfile } from '../types'
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-// Cache profile in localStorage for instant loading
-const PROFILE_CACHE_KEY = 'cached_profile'
-
-function getCachedProfile(): Profile | null {
-  try {
-    const cached = localStorage.getItem(PROFILE_CACHE_KEY)
-    if (cached) {
-      return JSON.parse(cached)
-    }
-  } catch (e) {
-    console.warn('[AuthContext] Failed to read cached profile:', e)
-  }
-  return null
-}
-
-function setCachedProfile(profile: Profile | null) {
-  try {
-    if (profile) {
-      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile))
-    } else {
-      localStorage.removeItem(PROFILE_CACHE_KEY)
-    }
-  } catch (e) {
-    console.warn('[AuthContext] Failed to cache profile:', e)
-  }
-}
-
+// ── AuthProvider ──────────────────────────────────────────────────────────────
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(() => getCachedProfile())
-  const [isVerified, setIsVerified] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  const isAuthenticated = !!user
-  const role = profile?.role || null
-  const fetchingProfileFor = useRef<string | null>(null)
-  const mounted = useRef(false)
-  const didInit = useRef(false)
+  const cleanupRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    mounted.current = true;
-    if (didInit.current) return;
-    didInit.current = true;
-
-    void (async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (!mounted.current) return;
-        if (error) throw error;
-        console.log('[AuthContext] Initial session check:', session?.user?.id);
-        if (session?.user) {
-          setUser(session.user);
-          const cached = getCachedProfile();
-          if (cached && cached.id === session.user.id) {
-            console.log('[AuthContext] Using cached profile for instant load');
-            setProfile(cached);
-            setIsVerified(cached.role !== 'seller'); // Optimistic
-          }
-          await fetchProfile(session.user.id, !!cached);
-        } else {
-          setUser(null);
-          setProfile(null);
-          setCachedProfile(null);
-          setIsVerified(false);
-        }
-        setLoading(false);
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return;
-        console.error('[AuthContext] Initial session check failed:', err);
-        if (mounted.current) setLoading(false);
-      }
-    })().catch((err) => {
-      if (err?.name === 'AbortError') return;
-      console.error('[AuthContext] Unhandled initializeAuth:', err);
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      void (async () => {
-        if (!mounted.current) return;
-        console.log(`[AuthContext] Event: ${event}`, session?.user?.id);
-        console.log('[AuthContext] User metadata:', session?.user?.user_metadata);
-        if (session?.user) {
-          setUser(session.user);
-          const cached = getCachedProfile();
-          if (cached && cached.id === session.user.id) {
-            setProfile(cached);
-            setIsVerified(cached.role !== 'seller'); // Optimistic
-          }
-          await fetchProfile(session.user.id, !!cached);
-        } else {
-          setUser(null);
-          setProfile(null);
-          setCachedProfile(null);
-          setIsVerified(false);
-        }
-        setLoading(false);
-      })().catch(err => {
-        if (err?.name === 'AbortError') return;
-        console.error('[AuthContext] Unhandled auth change:', err);
-      });
-    });
+    // Initialize the Zustand store once on mount.
+    // initialize() starts the Supabase session check + auth subscription
+    // and returns a cleanup fn to unsubscribe when the app unmounts.
+    cleanupRef.current = useAuthStore.getState().initialize()
 
     return () => {
-      mounted.current = false;
-      sub?.subscription?.unsubscribe();
-    };
-  }, []);
-
-  const fetchProfile = async (userId: string, isBackgroundRefresh = false) => {
-    if (fetchingProfileFor.current === userId) {
-      console.log('[AuthContext] Already fetching profile, skipping')
-      return
+      cleanupRef.current?.()
     }
-    
-    try {
-      fetchingProfileFor.current = userId
-      // Only set loading true if we don't have cached data (not a background refresh)
-      if (!isBackgroundRefresh) {
-        setLoading(true)
-      }
-      console.log('[AuthContext] fetchProfile START for:', userId, isBackgroundRefresh ? '(background)' : '')
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle()
+  }, [])
 
-      if (!mounted.current) return
-
-      if (error) {
-        console.error('[AuthContext] fetchProfile DB ERROR:', error)
-        if (error.code === 'PGRST303' || error.message?.includes('JWT expired')) {
-          console.error('[AuthContext] JWT expired, attempting session refresh...')
-          const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession()
-          if (!refreshErr && refreshed?.session?.access_token) {
-            console.log('[AuthContext] Session refreshed, retrying profile fetch...')
-            // Clear fetching flag before retry so the new attempt can proceed
-            fetchingProfileFor.current = null
-            return await fetchProfile(userId, isBackgroundRefresh)
-          }
-          console.error('[AuthContext] Session refresh failed, signing out...')
-          await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
-          setIsVerified(false)
-          return
-        }
-      }
-
-      if (!data) {
-        // Profile doesn't exist, create it (safety net)
-        console.log('[AuthContext] Profile missing in DB, attempting safety net creation...')
-        
-        // Wait a moment for the database trigger to complete
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        // Try fetching again in case trigger just completed
-        const { data: retryData, error: retryError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle()
-        
-        if (!retryError && retryData) {
-          console.log('[AuthContext] Profile found on retry:', retryData)
-          setProfile(retryData)
-          setCachedProfile(retryData)
-          
-          if (retryData.role === 'seller') {
-            const { data: storeData } = await supabase.from('seller_stores').select('is_verified').eq('owner_id', userId).maybeSingle()
-            setIsVerified(storeData?.is_verified ?? false)
-          } else {
-            setIsVerified(true)
-          }
-          return
-        }
-        
-        const { data: { user: userData } } = await supabase.auth.getUser()
-        console.log('[AuthContext] User metadata for safety net:', userData?.user_metadata)
-        if (userData) {
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .upsert({
-              id: userData.id,
-              full_name: userData.user_metadata.full_name || '',
-              role: userData.user_metadata.role || 'buyer'
-            })
-            .select()
-            .maybeSingle()
-          
-          if (!createError && newProfile) {
-            console.log('[AuthContext] Profile created/synced via safety net:', newProfile)
-            setProfile(newProfile)
-            setCachedProfile(newProfile)
-            
-            if (newProfile.role === 'seller') {
-              const { data: storeData } = await supabase.from('seller_stores').select('is_verified').eq('owner_id', userId).maybeSingle()
-              setIsVerified(storeData?.is_verified ?? false)
-            } else {
-              setIsVerified(true)
-            }
-          } else {
-            console.error('[AuthContext] Safety net upsert failed:', createError)
-            // Create a minimal profile in memory
-            const fallbackProfile: Profile = {
-              id: userData.id,
-              full_name: userData.user_metadata.full_name || '',
-              role: userData.user_metadata.role || 'buyer',
-              phone: null,
-              email: null,
-              date_of_birth: null,
-              gender: null,
-              municipality: null,
-              province: null,
-              created_at: new Date().toISOString()
-            }
-            console.log('[AuthContext] Using fallback profile:', fallbackProfile)
-            setProfile(fallbackProfile)
-            setIsVerified(fallbackProfile.role !== 'seller')
-          }
-        }
-      } else {
-        console.log('[AuthContext] Profile loaded successfully, role:', data.role)
-        setProfile(data)
-        setCachedProfile(data)
-        
-        if (data.role === 'seller') {
-          const { data: storeData } = await supabase.from('seller_stores').select('is_verified').eq('owner_id', userId).maybeSingle()
-          setIsVerified(storeData?.is_verified ?? false)
-        } else {
-          setIsVerified(true)
-        }
-      }
-    } catch (error) {
-      console.error('[AuthContext] Critical error in fetchProfile:', error)
-      // On error, create a fallback profile from user metadata
-      try {
-        const { data: { user: userData } } = await supabase.auth.getUser()
-        if (userData && mounted.current) {
-          const fallbackProfile: Profile = {
-            id: userData.id,
-            full_name: userData.user_metadata.full_name || '',
-            role: userData.user_metadata.role || 'buyer',
-            phone: null,
-            email: null,
-            date_of_birth: null,
-            gender: null,
-            municipality: null,
-            province: null,
-            created_at: new Date().toISOString()
-          }
-          console.log('[AuthContext] Using fallback profile due to error')
-          setProfile(fallbackProfile)
-          setIsVerified(fallbackProfile.role !== 'seller')
-        }
-      } catch (e) {
-        console.error('[AuthContext] Failed to get user for fallback:', e)
-      }
-    } finally {
-      console.log('[AuthContext] fetchProfile FINISHED for:', userId)
-      fetchingProfileFor.current = null
-      setLoading(false)
-    }
-  }
-
-  const signOut = async () => {
-    console.log('[AuthContext] Signing out...')
-    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
-    setUser(null)
-    setProfile(null)
-    setCachedProfile(null)
-    setIsVerified(false)
-    setLoading(false)
-  }
-
-  return (
-    <AuthContext.Provider value={{ user, profile, role, isAuthenticated, isVerified, loading, signOut }}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <>{children}</>
 }
 
+// ── useAuth ───────────────────────────────────────────────────────────────────
+// Backward-compatible hook — reads directly from the Zustand store.
+// All 22 existing consumers work with zero changes.
 export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+  const {
+    user,
+    profile,
+    sellerProfile,
+    role,
+    isAuthenticated,
+    isVerified,
+    loading,
+    logout,
+    refreshSellerProfile,
+  } = useAuthStore()
+
+  return {
+    user,
+    profile,
+    sellerProfile,
+    role,
+    isAuthenticated,
+    isVerified,
+    loading,
+    signOut: logout,
+    refreshSellerProfile,
   }
-  return context
 }

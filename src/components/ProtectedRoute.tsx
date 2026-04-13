@@ -1,6 +1,6 @@
 import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuthStore } from '../store/useAuthStore'
 import { UserRole } from '../types'
 
 interface ProtectedRouteProps {
@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { user, profile, isVerified, loading } = useAuth()
+  const { user, profile, isVerified, loading } = useAuthStore()
   const location = useLocation()
 
   if (loading) {
@@ -33,8 +33,14 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
     }
   }
 
-  // Block unverified sellers from protected routes EXCEPT the onboarding route
-  if (profile?.role === 'seller' && !isVerified && !location.pathname.includes('/onboarding')) {
+  // Block unverified sellers from protected routes EXCEPT onboarding.
+  // Also check localStorage cache as a fallback — after onboarding completes,
+  // the store was just created but the store may not have re-fetched yet.
+  const cachedVerified = (() => {
+    try { return localStorage.getItem('cached_verified') === 'true' } catch { return false }
+  })()
+
+  if (profile?.role === 'seller' && !isVerified && !cachedVerified && !location.pathname.includes('/onboarding')) {
     return <Navigate to="/seller/onboarding" replace />
   }
 

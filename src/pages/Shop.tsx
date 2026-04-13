@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchCategoryThumbnails, getPlaceholderImage } from '../lib/categories'
 import { Product, Category } from '../types'
-import { Search, Filter, SlidersHorizontal, ChevronRight, ChevronLeft, X, LayoutGrid, Package, Map as MapIcon } from 'lucide-react'
+import { Search, Filter, SlidersHorizontal, ChevronRight, ChevronLeft, X, LayoutGrid, Package, Map as MapIcon, Flame } from 'lucide-react'
 import ProductImage from '../components/ProductImage'
 import ErrorAlert from '../components/ErrorAlert'
 import { Button } from '../components/ui/Button'
@@ -15,6 +15,20 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { useDebounce } from '../hooks/useDebounce'
 import { Helmet } from 'react-helmet-async'
 import { ShopMap, ProductGrid, CategoryFilterBar, ShopFilters } from '../components/shop'
+
+// Haversine formula to calculate true geographic distance
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 999999
+  const R = 6371 // Earth radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+  return R * c
+}
 
 export default function Shop() {
   const { profile } = useAuth()
@@ -34,13 +48,14 @@ export default function Shop() {
   const selectedCategory = searchParams.get('category') || 'all'
   const selectedStore = searchParams.get('store') || 'all'
   const sortBy = searchParams.get('sort') || 'newest'
+  const saleFilter = searchParams.get('sale') === 'true'
 
   const PAGE_SIZE = 24
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  const filtersKey = `${selectedCategory}-${selectedStore}-${sortBy}-${debouncedSearchTerm}`
+  const filtersKey = `${selectedCategory}-${selectedStore}-${sortBy}-${debouncedSearchTerm}-${saleFilter}`
   const [currentFiltersKey, setCurrentFiltersKey] = useState(filtersKey)
 
   // Update URL params when debounced search term changes
@@ -69,18 +84,31 @@ export default function Shop() {
     }
   }, [page, filtersKey, currentFiltersKey])
 
+  // Grab user location immediately to enable instant proximity sorting
   useEffect(() => {
-    if (viewMode === 'map' && !userLocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-      }, (err) => {
-        console.error("Geolocation failed:", err)
-        setUserLocation({ lat: -25.5585, lng: 28.0183 }) // Hebron Mall Northwest fallback
-      })
+    if (!userLocation && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        }, 
+        (err) => {
+          console.warn("Geolocation not available for distance sorting. Using fallback.", err)
+          setUserLocation({ lat: -25.5585, lng: 28.0183 }) // Hebron Mall Northwest fallback
+        },
+        { enableHighAccuracy: false, timeout: 5000 }
+      )
     }
-  }, [viewMode])
+  }, [])
 
   const fetchCategories = async () => {
+    const { data: validProducts } = await supabase
+      .from('products')
+      .select('category_id')
+      .eq('status', 'approved')
+      .lt('stock', 999)
+      
+    const validCategoryIds = new Set(validProducts?.map(p => p.category_id).filter(Boolean))
+
     const { data, error } = await supabase.from('categories').select('*').order('name')
     if (error) {
       console.error('Error fetching categories:', error)
@@ -91,7 +119,8 @@ export default function Shop() {
       
       // Sort: categories with images first, then alphabetically
       const hasImage = (cat: any) => thumbs[cat.id]
-      const sorted = (data || []).sort((a, b) => {
+      const validCats = (data || []).filter(c => validCategoryIds.has(c.id))
+      const sorted = validCats.sort((a, b) => {
         const aHasImg = hasImage(a)
         const bHasImg = hasImage(b)
         if (aHasImg !== bHasImg) return aHasImg ? -1 : 1
@@ -112,15 +141,23 @@ export default function Shop() {
     try {
       let query = supabase
         .from('products')
-        .select('*, product_images(*), seller_store:seller_stores(*)', { count: 'exact' })
+        .select('*, product_images(*), seller_store:seller_profiles!inner(*)', { count: 'exact' })
         .eq('status', 'approved')
+        .eq('seller_store.onboarding_completed', true)
+        .eq('seller_store.kyc_status', 'approved')
+        .neq('seller_store.seller_type', 'service')
+        .lt('stock', 999)
 
       if (selectedCategory !== 'all') {
         query = query.eq('category_id', selectedCategory)
       }
 
       if (selectedStore !== 'all') {
-        query = query.eq('seller_store_id', selectedStore)
+        query = query.eq('seller_id', selectedStore)
+      }
+
+      if (saleFilter) {
+        query = query.eq('is_on_sale', true)
       }
 
       if (debouncedSearchTerm) {
@@ -142,13 +179,31 @@ export default function Shop() {
       const { data, count, error: pError } = await query
       if (pError) throw pError
       
+      let fetchedItems = data || []
+      
+      // Proximity Sorting: Closest products first!
+      if (userLocation) {
+         fetchedItems.forEach((p: any) => {
+           if (p.seller_store?.latitude && p.seller_store?.longitude) {
+              p.distance = getDistance(userLocation.lat, userLocation.lng, p.seller_store.latitude, p.seller_store.longitude)
+           } else {
+              p.distance = 999999
+           }
+         })
+         
+         // Only sort by distance if the user isn't overriding with price sorting
+         if (sortBy !== 'price_asc' && sortBy !== 'price_desc') {
+            fetchedItems.sort((a: any, b: any) => a.distance - b.distance)
+         }
+      }
+      
       if (isReset) {
-        setProducts(data || [])
+        setProducts(fetchedItems as Product[])
       } else {
         setProducts(prev => {
           // Avoid duplicates by filtering out items already in the list
           const existingIds = new Set(prev.map(p => p.id))
-          const newItems = (data || []).filter(p => !existingIds.has(p.id))
+          const newItems = (fetchedItems as Product[]).filter(p => !existingIds.has(p.id))
           return [...prev, ...newItems]
         })
       }
@@ -192,6 +247,14 @@ export default function Shop() {
     setSearchParams(prev => {
       if (value !== 'newest') prev.set('sort', value)
       else prev.delete('sort')
+      return prev
+    })
+  }
+
+  const handleSaleFilterChange = () => {
+    setSearchParams(prev => {
+      if (!saleFilter) prev.set('sale', 'true')
+      else prev.delete('sale')
       return prev
     })
   }
@@ -251,6 +314,14 @@ export default function Shop() {
                 <MapIcon size={14} /> Proximity
               </button>
             </div>
+
+            {/* Sale Filter Button */}
+            <button 
+              onClick={handleSaleFilterChange}
+              className={`flex items-center gap-2 px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-500 border shadow-xl ${saleFilter ? 'bg-red-600 text-white border-red-600 shadow-red-200' : 'bg-white/50 backdrop-blur-xl border-white text-stone-400 hover:text-red-600 hover:border-red-200'}`}
+            >
+              <Flame size={14} className={saleFilter ? 'fill-white' : ''} /> {saleFilter ? 'Showing Sales' : 'Hot Deals'}
+            </button>
             
             <div className="h-10 w-px bg-stone-200 hidden md:block" />
 

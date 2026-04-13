@@ -1,9 +1,12 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { HUB } from "../../utils/hub";
 
 export default function MapboxMap({ services, userLocation, onMarkerClick, selectedServiceId, onMapClick }: any) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const [webGLError, setWebGLError] = useState<string | null>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
 
   // 1. Initialize Map (Once)
   useEffect(() => {
@@ -15,21 +18,47 @@ export default function MapboxMap({ services, userLocation, onMarkerClick, selec
     if (isPlaceholder || !mapContainerRef.current || mapInstance.current) return;
 
     import("mapbox-gl").then((mapboxgl: any) => {
-      mapboxgl.default.accessToken = MAPBOX_TOKEN;
-      const map = new mapboxgl.default.Map({
-        container: mapContainerRef.current!,
-        style: "mapbox://styles/mapbox/streets-v12", // More stable, no incident errors
-        center: [28.0183, -25.5585], 
-        zoom: 12,
-        pitch: 45,
-        bearing: -17.6,
-        antialias: true
-      });
+      // 0. Ensure container still exists (prevents race condition if unmounted during import)
+      if (!mapContainerRef.current) return;
 
-      mapInstance.current = map;
-      map.addControl(new mapboxgl.default.NavigationControl(), 'top-right');
-      
-      map.on('load', () => {
+      // 1. Check for WebGL Support
+      if (!mapboxgl.default.supported()) {
+        const msg = "WebGL is not supported by your browser or environment. The map cannot be displayed.";
+        console.error(`❌ [Mapbox] ${msg}`);
+        setWebGLError(msg);
+        return;
+      }
+
+      // 2. Clear the container (solves the "should be empty" warning)
+      if (mapContainerRef.current) {
+        mapContainerRef.current.innerHTML = '';
+      }
+
+      try {
+        mapboxgl.default.accessToken = MAPBOX_TOKEN;
+        const map = new mapboxgl.default.Map({
+          container: mapContainerRef.current!,
+          style: "mapbox://styles/mapbox/streets-v12", 
+          center: [HUB.lng, HUB.lat],  // The Internet Guy Cafe — hub
+          zoom: 14,
+          pitch: 45,
+          bearing: -17.6,
+          antialias: true,
+          failIfMajorPerformanceCaveat: false
+        });
+
+        mapInstance.current = map;
+        map.addControl(new mapboxgl.default.NavigationControl(), 'top-right');
+        setIsMapReady(true);
+        
+        map.on('error', (e: any) => {
+          console.error("❌ Mapbox GL Error:", e.error);
+          if (e.error?.message?.includes('WebGL')) {
+            setWebGLError("WebGL initialization failed after start. Try reloading the page.");
+          }
+        });
+
+        map.on('load', () => {
         // Source for heatmap
         map.addSource('services', {
           type: 'geojson',
@@ -54,12 +83,17 @@ export default function MapboxMap({ services, userLocation, onMarkerClick, selec
           }
         });
       });
-    });
+    } catch (err: any) {
+      console.error("❌ Failed to initialize Mapbox:", err);
+      setWebGLError(err.message || "Failed to initialize Mapbox map.");
+    }
+  });
 
     return () => {
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
+        setIsMapReady(false);
       }
     };
   }, []);
@@ -67,7 +101,7 @@ export default function MapboxMap({ services, userLocation, onMarkerClick, selec
   // 2. Manage Markers & Data (Sync with Props)
   useEffect(() => {
     const map = mapInstance.current;
-    if (!map) return;
+    if (!map || !isMapReady) return;
 
     // Helper to add data to heatmap source
     const updateHeatmap = () => {
@@ -79,7 +113,7 @@ export default function MapboxMap({ services, userLocation, onMarkerClick, selec
             type: 'Feature',
             geometry: {
               type: 'Point',
-              coordinates: [s.seller_store?.longitude, s.seller_store?.latitude]
+              coordinates: [s.longitude, s.latitude]
             }
           })).filter((f: any) => f.geometry.coordinates[0] && f.geometry.coordinates[1]) || []
         });
@@ -100,6 +134,8 @@ export default function MapboxMap({ services, userLocation, onMarkerClick, selec
       const bounds = new mapboxgl.default.LngLatBounds();
       let hasPoints = false;
       const addedStores = new Set();
+
+      console.log("🔍 [Map] Rendering markers. Total services passed to map:", services?.length);
 
       // Seller Markers
       services?.forEach((s: any) => {
@@ -133,7 +169,10 @@ export default function MapboxMap({ services, userLocation, onMarkerClick, selec
           });
           
           const marker = new mapboxgl.default.Marker(el).setLngLat([lon, lat]).addTo(map);
+          console.log(`✅ [Map] Marker set for service ${s.id} (Store: ${s.seller_store.store_name}) at [${lon}, ${lat}] - Live: ${isLive}`);
           markersRef.current.push(marker);
+        } else {
+          console.warn(`⚠️ [Map] Service ${s.id} skipped - missing coordinates:`, s.seller_store);
         }
       });
 
@@ -151,14 +190,37 @@ export default function MapboxMap({ services, userLocation, onMarkerClick, selec
       }
 
       if (hasPoints && !selectedServiceId) {
-        map.fitBounds(bounds, { padding: { top: 80, bottom: 380, left: 80, right: 80 }, maxZoom: 14 });
+        const container = map.getContainer();
+        const height = container.clientHeight;
+        const width = container.clientWidth;
+        
+        // Prevent "Map cannot fit within canvas" error on small heights/widths
+        // by scaling padding based on available space
+        const adjustedPadding = {
+          top: Math.min(80, height * 0.1),
+          bottom: Math.min(380, height * 0.4),
+          left: Math.min(80, width * 0.1),
+          right: Math.min(80, width * 0.1)
+        };
+
+        try {
+          map.fitBounds(bounds, { 
+            padding: adjustedPadding, 
+            maxZoom: 14,
+            animate: false // Immediate on initial load to prevent race conditions
+          });
+        } catch (e) {
+          console.warn("⚠️ fitBounds failed, falling back to center:", e);
+          const center = bounds.getCenter();
+          map.setCenter(center);
+        }
       }
     });
-  }, [services, userLocation, selectedServiceId]);
+  }, [services, userLocation, selectedServiceId, isMapReady]);
 
   // 3. Sync Selection focus
   useEffect(() => {
-    if (selectedServiceId && mapInstance.current && services?.length) {
+    if (isMapReady && selectedServiceId && mapInstance.current && services?.length) {
       const s = services.find((x: any) => x.id === selectedServiceId);
       if (s?.seller_store?.longitude && s?.seller_store?.latitude) {
         mapInstance.current?.flyTo({
@@ -170,19 +232,31 @@ export default function MapboxMap({ services, userLocation, onMarkerClick, selec
         });
       }
     }
-  }, [selectedServiceId]);
+  }, [selectedServiceId, isMapReady]);
 
   const P1 = import.meta.env.VITE_MAPBOX_TOKEN_P1;
   const P2 = import.meta.env.VITE_MAPBOX_TOKEN_P2;
   const MAPBOX_TOKEN = [P1, P2].filter(Boolean).join('');
   const isPlaceholder = !MAPBOX_TOKEN || MAPBOX_TOKEN === 'your_real_key' || !P1 || !P2;
 
-  if (isPlaceholder) {
+  if (isPlaceholder || webGLError) {
     return (
-      <div className="h-full w-full bg-stone-100 flex flex-col items-center justify-center text-stone-500 font-bold p-8 text-center rounded-2xl">
-        <span className="text-4xl mb-4">🗺️</span>
-        Map unavailable
-        <span className="text-xs font-normal mt-2 text-stone-400">Set Mapbox tokens in your .env to enable the map view.</span>
+      <div className="h-full w-full bg-stone-100 flex flex-col items-center justify-center text-stone-500 font-bold p-8 text-center rounded-2xl border-2 border-dashed border-stone-200">
+        <span className="text-4xl mb-4">{isPlaceholder ? '🗺️' : '⚠️'}</span>
+        {isPlaceholder ? 'Map unavailable' : 'WebGL Error'}
+        <span className="text-xs font-normal mt-2 text-stone-400 max-w-xs">
+          {isPlaceholder 
+            ? 'Set Mapbox tokens in your .env to enable the map view.' 
+            : (webGLError || 'Your browser encountered an error initializing the 3D map engine.')}
+        </span>
+        {!isPlaceholder && (
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-6 px-4 py-2 bg-white rounded-full border border-stone-200 text-[10px] uppercase tracking-widest hover:bg-stone-50 transition-colors"
+          >
+            Reload Page
+          </button>
+        )}
       </div>
     );
   }

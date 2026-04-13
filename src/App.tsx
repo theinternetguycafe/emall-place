@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { HashRouter as Router, Routes, Route } from 'react-router-dom'
+import 'mapbox-gl/dist/mapbox-gl.css' // Preload styles for the map
 import { AuthProvider } from './contexts/AuthContext'
 import { CartProvider } from './contexts/CartContext'
 import { ToastProvider } from './contexts/ToastContext'
@@ -20,8 +21,8 @@ import ProductDetails from './pages/ProductDetails'
 import SellerDashboard from './pages/SellerDashboard'
 import ProductForm from './pages/ProductForm'
 import SellerOnboardingWizard from './pages/onboarding/SellerOnboardingWizard'
-import AdminKYCDashboard from './pages/admin/AdminKYCDashboard';
 import AdminRoute from './components/auth/AdminRoute';
+import ServicesPage from './pages/ServicesPage'
 
 import Cart from './pages/Cart'
 
@@ -30,6 +31,7 @@ import CheckoutSuccess from './pages/CheckoutSuccess'
 import CheckoutCancelled from './pages/CheckoutCancelled'
 import Orders from './pages/Orders'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminKYCDashboard from './pages/admin/AdminKYCDashboard'
 import HelpCentre from './pages/HelpCentre'
 import ShippingPolicy from './pages/ShippingPolicy'
 import ReturnsPolicy from './pages/ReturnsPolicy'
@@ -44,6 +46,13 @@ function AppContent() {
   const { completeStep } = useOnboarding()
 
   const tourSteps = tourType === 'checklist' ? CHECKLIST_TOUR_STEPS : SELLER_TOUR_STEPS
+  
+  // Preload Mapbox engine as soon as the app starts to ensure instant map availability
+  useEffect(() => {
+    import('mapbox-gl').then(() => {
+      if (import.meta.env.DEV) console.log('[App] Mapbox engine preloaded');
+    });
+  }, []);
 
   const handleTourComplete = async () => {
     if (tourType === 'seller') {
@@ -81,7 +90,7 @@ function AppContent() {
           <Route path="/auth" element={<Auth />} />
           <Route path="/shop" element={<Shop />} />
           <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/store/:storeId" element={<StoreHome />} />
+          <Route path="/store/:storeSlug" element={<StoreHome />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/help-centre" element={<HelpCentre />} />
@@ -133,6 +142,22 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/seller/services/new" 
+            element={
+              <ProtectedRoute allowedRoles={['seller', 'admin']}>
+                <ProductForm />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/seller/services/:id/edit" 
+            element={
+              <ProtectedRoute allowedRoles={['seller', 'admin']}>
+                <ProductForm />
+              </ProtectedRoute>
+            } 
+          />
           
           <Route 
             path="/admin" 
@@ -150,6 +175,10 @@ function AppContent() {
                 <Account />
               </ProtectedRoute>
             } 
+          />
+          <Route 
+            path="/services" 
+            element={<ServicesPage />} 
           />
           <Route 
             path="/account/orders" 

@@ -6,14 +6,16 @@ import { useOnboarding } from '../contexts/OnboardingContext'
 import { fetchCategoryThumbnails, getPlaceholderImage } from '../lib/categories'
 import { Product, Category } from '../types'
 import ProductImage from '../components/ProductImage'
-import { ArrowRight, ShoppingBag, ShieldCheck, Truck, Star, Heart, ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowRight, ShoppingBag, ShieldCheck, Truck, Star, ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '../components/ui/Button'
+import LikeButton from '../components/ui/LikeButton'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
 import { OnboardingModal } from '../components/onboarding/OnboardingModal'
 import { Helmet } from 'react-helmet-async'
 import ServicesSlider from '../components/home/ServicesSlider'
+import OnSaleSlider from '../components/home/OnSaleSlider'
 import { SellerCautionNote } from '../components/seller/SellerCautionNote'
 
 export default function Home() {
@@ -57,7 +59,7 @@ export default function Home() {
           .select(
             `
             id,
-            seller_store_id,
+            seller_id,
             category_id,
             title,
             description,
@@ -65,12 +67,12 @@ export default function Home() {
             stock,
             status,
             created_at,
-            seller_store:seller_stores (
+            seller_store:seller_profiles!seller_id!inner (
               id,
-              owner_id,
               store_name,
-              description,
-              status,
+              rating_avg,
+              onboarding_completed,
+              kyc_status,
               created_at
             ),
             product_images:product_images (
@@ -82,6 +84,9 @@ export default function Home() {
           `
           )
           .eq('status', 'approved')
+          .eq('seller_store.onboarding_completed', true)
+          .eq('seller_store.kyc_status', 'approved')
+          .neq('seller_store.store_name', 'dev test 2')
           .order('created_at', { ascending: false })
           .limit(8)
 
@@ -96,13 +101,26 @@ export default function Home() {
         setFeaturedProducts(safeProducts)
 
         // -------- CATEGORIES --------
-        const { data: cats, error: cError } = await supabase
-          .from('categories')
-          .select('*')
-          .order('name', { ascending: true })
-          .limit(6)
-
-        if (cError) throw cError
+        const { data: activeProductCats } = await supabase
+          .from('products')
+          .select('category_id')
+          .eq('status', 'approved')
+          .lt('stock', 999)
+          
+        const validCategoryIds = new Set(activeProductCats?.map(p => p.category_id).filter(Boolean))
+        
+        let cats: any[] = []
+        if (validCategoryIds.size > 0) {
+          const { data, error: cError } = await supabase
+            .from('categories')
+            .select('*')
+            .in('id', Array.from(validCategoryIds))
+            .order('name', { ascending: true })
+            .limit(6)
+  
+          if (cError) throw cError
+          cats = data || []
+        }
 
         // Fetch category thumbnails
         const thumbs = await fetchCategoryThumbnails()
@@ -121,29 +139,73 @@ export default function Home() {
 
         // -------- SERVICES --------
         const { data: services, error: sError } = await supabase
-          .from('products')
+          .from('services')
           .select(`
             id,
             title,
             description,
-            price,
-            product_images:product_images(url),
-            seller_store:seller_stores!inner(
+            base_rate,
+            seller_store:seller_profiles!seller_id!inner(
               id,
               store_name,
+              store_slug,
               is_online,
-              last_seen_at,
-              average_rating,
-              seller_type
+              rating_avg,
+              seller_type,
+              onboarding_completed,
+              kyc_status,
+              stores ( logo_url, banner_url )
             )
           `)
           .eq('status', 'approved')
-          .or('seller_type.eq.service,seller_type.eq.both', { foreignTable: 'seller_stores' })
+          .eq('is_active', true)
+          .eq('seller_store.onboarding_completed', true)
+          .eq('seller_store.kyc_status', 'approved')
+          .neq('seller_store.store_name', 'dev test 2')
           .order('created_at', { ascending: false })
           .limit(6)
 
         if (!sError && services) {
-          setFeaturedServices(services)
+          // Calculate lowest price per provider for "Prices From" labels
+          const sellerIds = Array.from(new Set(services.map((s: any) => s.seller_store?.id).filter(Boolean)));
+          
+          let minPrices: Record<string, number> = {};
+          if (sellerIds.length > 0) {
+            const { data: allSvcRates } = await supabase
+              .from('services')
+              .select('seller_id, base_rate')
+              .in('seller_id', sellerIds)
+              .eq('status', 'approved')
+              .eq('is_active', true);
+            
+            if (allSvcRates) {
+              allSvcRates.forEach((rate: any) => {
+                const sid = rate.seller_id;
+                const val = Number(rate.base_rate);
+                if (!minPrices[sid] || val < minPrices[sid]) {
+                  minPrices[sid] = val;
+                }
+              });
+            }
+          }
+
+          const formattedServices = services.map((s: any) => {
+            const storeRow = Array.isArray(s.seller_store?.stores) ? s.seller_store.stores[0] : s.seller_store?.stores;
+            const sellerId = s.seller_store?.id;
+            return {
+              ...s,
+              price: minPrices[sellerId] || s.base_rate,
+              seller_store: {
+                ...s.seller_store,
+                logo_url: storeRow?.logo_url,
+                banner_url: storeRow?.banner_url,
+              }
+            };
+          });
+          console.log('[Home] Real Services Fetched with Min Rates:', formattedServices.length, formattedServices);
+          setFeaturedServices(formattedServices)
+        } else if (sError) {
+          console.error('[Home] Services Fetch Error:', sError);
         }
       } catch (err: any) {
         // Ignore aborts (React 18 StrictMode / navigation / unmount)
@@ -233,21 +295,43 @@ export default function Home() {
             </p>
 
             <div className="flex flex-wrap gap-6">
-              <Link to="/shop">
+              <Link to="/marketplace">
                 <Button size="lg" className="rounded-full px-12 py-9 text-xl font-black bg-white text-slate-950 hover:bg-emerald-50 transition-all shadow-[0_20px_40px_-15px_rgba(255,255,255,0.3)]">
                   Explore Now <ArrowRight className="ml-3 h-6 w-6" />
                 </Button>
               </Link>
 
-              <Link to="/auth">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="rounded-full px-12 py-9 text-xl font-black border-white/20 text-white hover:bg-white hover:text-slate-950 backdrop-blur-md transition-all"
-                >
-                  Join the Fam
-                </Button>
-              </Link>
+              {!profile ? (
+                <Link to="/auth?signup=true">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="rounded-full px-12 py-9 text-xl font-black border-white/20 text-white hover:bg-white hover:text-slate-950 backdrop-blur-md transition-all"
+                  >
+                    Join the Fam
+                  </Button>
+                </Link>
+              ) : profile.role === 'seller' ? (
+                <Link to="/seller">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="rounded-full px-12 py-9 text-xl font-black border-white/20 text-white hover:bg-white hover:text-slate-950 backdrop-blur-md transition-all"
+                  >
+                    Seller Hub
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/account">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="rounded-full px-12 py-9 text-xl font-black border-white/20 text-white hover:bg-white hover:text-slate-950 backdrop-blur-md transition-all"
+                  >
+                    My Account
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -303,7 +387,7 @@ export default function Home() {
             </h2>
           </div>
 
-          <Link to="/shop">
+          <Link to="/marketplace">
             <Button variant="outline" className="rounded-full px-8 py-6 font-black uppercase tracking-widest text-[10px] group border-stone-200">
               See Everything <ArrowUpRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
             </Button>
@@ -325,7 +409,7 @@ export default function Home() {
             {categories.map((category) => {
               const thumbUrl = categoryThumbnails[category.id] || getPlaceholderImage()
               return (
-                <Link key={category.id} to={`/shop?category=${category.id}`} className="group flex flex-col items-center flex-shrink-0 w-32 sm:w-40">
+                <Link key={category.id} to={`/marketplace?category=${category.id}`} className="group flex flex-col items-center flex-shrink-0 w-32 sm:w-40">
                   <div className="w-full aspect-[4/5] rounded-[2.5rem] bg-stone-100 mb-6 overflow-hidden relative border border-stone-200 shadow-sm group-hover:shadow-lg transition-all duration-300">
                     <img
                       src={thumbUrl}
@@ -358,6 +442,9 @@ export default function Home() {
       {/* SERVICES SLIDER */}
       <ServicesSlider services={featuredServices} />
 
+      {/* ON SALE SLIDER */}
+      <OnSaleSlider />
+
       {/* FEATURED PRODUCTS */}
       <section className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8 border-b border-stone-100 pb-12">
@@ -371,7 +458,7 @@ export default function Home() {
             </h2>
           </div>
 
-          <Link to="/shop">
+          <Link to="/marketplace">
             <Button variant="outline" className="rounded-full px-8 py-6 font-black uppercase tracking-widest text-[10px] group border-stone-200">
               The Full Stack <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
@@ -412,13 +499,7 @@ export default function Home() {
                     />
 
                     <div className="absolute top-6 right-6">
-                      <button
-                        type="button"
-                        onClick={(e) => e.preventDefault()}
-                        className="bg-white/90 backdrop-blur-md p-3 rounded-2xl text-stone-300 hover:text-rose-500 transition-all shadow-sm active:scale-90"
-                      >
-                        <Heart className="h-5 w-5" fill="currentColor" fillOpacity="0" />
-                      </button>
+                      <LikeButton productId={product.id} className="!p-3" />
                     </div>
 
                     {stock <= 5 && stock > 0 && (

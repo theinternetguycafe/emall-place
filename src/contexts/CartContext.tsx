@@ -56,7 +56,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearCart = () => setItems([])
 
-  const totalAmount = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+  const getEffectivePrice = (product: Product): number => {
+    if (product.is_on_sale && product.sale_price != null) {
+      const now = Date.now()
+      const start = product.sale_starts_at ? new Date(product.sale_starts_at).getTime() : 0
+      const end = product.sale_ends_at ? new Date(product.sale_ends_at).getTime() : Infinity
+      if (now >= start && now <= end) return product.sale_price
+    }
+    return product.price
+  }
+
+  const totalAmount = items.reduce((sum, item) => sum + getEffectivePrice(item.product) * item.quantity, 0)
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
 
   return (

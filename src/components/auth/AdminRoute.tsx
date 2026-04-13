@@ -1,10 +1,10 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../store/useAuthStore';
 import { Loader2 } from 'lucide-react';
 
 export default function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { role, loading, isAuthenticated } = useAuth();
+  const { role, loading, isAuthenticated } = useAuthStore();
 
   if (loading) {
     return (

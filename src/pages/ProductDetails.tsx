@@ -14,6 +14,7 @@ import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Helmet } from 'react-helmet-async'
+import { WhatsAppButton } from '../components/ui/WhatsAppButton'
 
 export default function ProductDetails() {
   const { id } = useParams<{ id: string }>()
@@ -36,7 +37,7 @@ export default function ProductDetails() {
     try {
       const { data, error: pError } = await supabase
         .from('products')
-        .select('*, product_images(*), seller_store:seller_store_id(*)')
+        .select('*, product_images(*), seller_store:seller_profiles(*)')
         .eq('id', id)
         .single()
 
@@ -173,12 +174,22 @@ export default function ProductDetails() {
                   navigate(`/store/${storeId}`)
                 }
               }}
-              className="inline-flex items-center gap-2 bg-stone-100 px-4 py-2 rounded-full text-stone-600 hover:bg-stone-200 hover:text-slate-900 transition-colors mb-6 group"
+              className="w-full sm:w-auto flex items-center justify-between gap-6 bg-white border-2 border-slate-900/5 hover:border-slate-900 p-2 pr-6 rounded-full shadow-sm hover:shadow-xl transition-all mb-8 group cursor-pointer"
             >
-              <Store className="h-4 w-4 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-black uppercase tracking-[0.2em]">
-                Sold by {(product as any).seller_store?.store_name || 'Local Seller'}
-              </span>
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 bg-stone-100 rounded-full flex items-center justify-center group-hover:bg-slate-900 transition-colors">
+                  <Store className="h-5 w-5 text-stone-500 group-hover:text-white transition-colors" />
+                </div>
+                <div className="flex flex-col items-start pr-4">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-stone-400">Storefront</span>
+                  <span className="font-black text-slate-900 text-sm">
+                    {(product as any).seller_store?.store_name || 'Local Seller'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center justify-center h-8 w-8 bg-stone-100 rounded-full group-hover:bg-slate-100 transition-colors">
+                <ArrowLeft className="h-4 w-4 text-slate-400 group-hover:text-slate-900 rotate-180 transition-colors" />
+              </div>
             </button>
             <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight mb-4 leading-[1.1]">{product.title}</h1>
             <div className="flex items-center gap-4 mb-8">
@@ -243,6 +254,16 @@ export default function ProductDetails() {
                 </div>
               )}
             </Button>
+            
+            <WhatsAppButton
+              sellerId={product.seller_id || ''}
+              sellerPhone={(product as any).seller_store?.whatsapp_number || (product as any).seller_store?.seller_phone}
+              productId={product.id}
+              productName={product.title}
+              price={saleInfo.displayPrice}
+              intent="buy"
+              className="w-full py-4 text-xl rounded-full mt-4 shadow-xl"
+            />
           </div>
         </div>
       </div>

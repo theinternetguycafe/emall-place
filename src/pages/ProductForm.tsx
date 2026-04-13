@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { Category } from '../types'
@@ -15,8 +15,11 @@ import { useOnboarding } from '../contexts/OnboardingContext'
 export default function ProductForm() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { profile } = useAuth()
   const { completeStep } = useOnboarding()
+  
+  const isService = location.pathname.includes('/services')
   
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(!!id)
@@ -30,7 +33,7 @@ export default function ProductForm() {
     title: '',
     description: '',
     price: '',
-    stock: '',
+    stock: isService ? '999' : '',
     category_id: '',
   })
 
@@ -96,23 +99,24 @@ export default function ProductForm() {
     setLoading(true)
 
     const DEBUG = import.meta.env.DEV
-    if (DEBUG) console.log('[ProductForm] handleSubmit START', { userId: profile?.id, isEditing: !!id })
+    console.log(`[ProductForm] Submitting to table: ${isService ? '✅ services (mirror) via products' : '✅ products'}`)
+    if (DEBUG) console.log('[ProductForm] handleSubmit START', { userId: profile?.id, isEditing: !!id, isService })
 
     try {
-      const { data: store, error: sError } = await supabase
-        .from('seller_stores')
-        .select('id')
-        .eq('owner_id', profile!.id)
+      const { data: sellerProfile, error: sError } = await supabase
+        .from('seller_profiles')
+        .select('id, latitude, longitude, seller_type')
+        .eq('user_id', profile!.id)
         .single()
 
-      if (sError || !store) throw new Error('Could not find your store. Please contact support.')
+      if (sError || !sellerProfile) throw new Error('Could not find your seller profile. Please contact support.')
 
       const productData = {
-        seller_store_id: store.id,
+        seller_id: sellerProfile.id,
         title: formData.title,
         description: formData.description,
         price: parseFloat(formData.price),
-        stock: parseInt(formData.stock),
+        stock: isService ? 999 : parseInt(formData.stock),
         category_id: formData.category_id || null,
         status: 'approved' 
       }
@@ -133,8 +137,48 @@ export default function ProductForm() {
           .single()
         if (iError) throw iError
         productId = product.id
-        if (DEBUG) console.log('[ProductForm] Product created', { productId, userId: profile!.id, storeId: (productData as any).seller_store_id })
+        if (DEBUG) console.log('[ProductForm] Product created', { productId, userId: profile!.id })
         
+        // Mirror to the `services` table for the live map/dispatch system
+        if (isService) {
+          console.log("SELLER PROFILE:", sellerProfile)
+          
+          const servicePayload: any = {
+            seller_id: sellerProfile.id,
+            title: formData.title,
+            description: formData.description,
+            base_rate: parseFloat(formData.price),
+            category_id: formData.category_id || null,
+            status: 'approved',
+            is_active: true,
+            latitude: sellerProfile.latitude || null,
+            longitude: sellerProfile.longitude || null
+          }
+          
+          console.log('[ProductForm] Inserting into services table:', servicePayload)
+          const { error: svcError } = await supabase.from('services').insert(servicePayload);
+          
+          if (svcError) {
+            console.error('[ProductForm] ⚠️ SERVICE INSERT FAILED:', svcError)
+            // If we caught a constraint error (23502), clarify it for the user
+            const msg = svcError.code === '23502' || svcError.message.includes('column "latitude" of relation "services" does not exist')
+              ? `Database schema mismatch: ${svcError.message}. Please run FIX_SERVICES_LOCATION.sql in Supabase.`
+              : svcError.message;
+            throw new Error(`Failed to publish service: ${msg}`)
+          } 
+          
+          console.log('[ProductForm] ✅ services table insert succeeded')
+          // Auto-online for service providers — ensure instant map visibility!
+          console.log('[ProductForm] Service detected. Ensuring seller is ONLINE with correct type.')
+          await supabase
+            .from("seller_profiles")
+            .update({
+              is_online: true,
+              seller_type: sellerProfile.seller_type === 'product' ? 'both' : sellerProfile.seller_type
+            })
+            .eq("id", sellerProfile.id)
+        }
+
         // Mark first product step as complete
         try {
           await completeStep('first_product')
@@ -165,7 +209,7 @@ export default function ProductForm() {
       }
 
       // Show success message
-      setSuccess(id ? 'Product updated successfully!' : 'Product published successfully!')
+      setSuccess(id ? `${isService ? 'Service' : 'Product'} updated successfully!` : `${isService ? 'Service' : 'Product'} published successfully!`)
       window.dispatchEvent(new CustomEvent('seller-tour:product-published'))
       
       // Navigate after a short delay to show the success message
@@ -202,8 +246,8 @@ export default function ProductForm() {
       </Button>
 
       <div className="mb-12">
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight">{id ? 'Refine Product' : 'Create Masterpiece'}</h1>
-        <p className="text-stone-500 mt-2">Provide the details that will make your product stand out.</p>
+        <h1 className="text-4xl font-black text-slate-900 tracking-tight">{id ? (isService ? 'Refine Service' : 'Refine Product') : (isService ? 'List a Service' : 'Create Masterpiece')}</h1>
+        <p className="text-stone-500 mt-2">Provide the details that will make your {isService ? 'service' : 'product'} stand out.</p>
       </div>
 
       {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
@@ -217,17 +261,17 @@ export default function ProductForm() {
             <Input
               id="product-title-input"
               data-tour="product-title"
-              label="Product Title"
-              placeholder="e.g. Handcrafted Leather Satchel"
+              label={isService ? 'Service Name' : 'Product Title'}
+              placeholder={isService ? 'e.g. 1 Hour Plumbing Assessment' : 'e.g. Handcrafted Leather Satchel'}
               required
               value={formData.title}
               onChange={e => setFormData({ ...formData, title: e.target.value })}
             />
 
             <div className="grid grid-cols-2 gap-6">
-              <div data-tour="product-price-field">
+              <div data-tour="product-price-field" className={isService ? "col-span-2" : ""}>
                 <Input
-                  label="Price (ZAR)"
+                  label={isService ? 'Base Rate / Fixed Price (ZAR)' : 'Price (ZAR)'}
                   type="number"
                   step="0.01"
                   required
@@ -235,15 +279,17 @@ export default function ProductForm() {
                   onChange={e => setFormData({ ...formData, price: e.target.value })}
                 />
               </div>
-              <div data-tour="product-stock-field">
-                <Input
-                  label="Stock Level"
-                  type="number"
-                  required
-                  value={formData.stock}
-                  onChange={e => setFormData({ ...formData, stock: e.target.value })}
-                />
-              </div>
+              {!isService && (
+                <div data-tour="product-stock-field">
+                  <Input
+                    label="Stock Level"
+                    type="number"
+                    required
+                    value={formData.stock}
+                    onChange={e => setFormData({ ...formData, stock: e.target.value })}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="w-full space-y-1.5" data-tour="product-category-select">
@@ -266,7 +312,7 @@ export default function ProductForm() {
               <textarea
                 rows={6}
                 required
-                placeholder="Describe the soul of your product..."
+                placeholder={isService ? 'Describe the specifics of the service you offer...' : 'Describe the soul of your product...'}
                 className="flex w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm transition-all placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
                 value={formData.description}
                 onChange={e => setFormData({ ...formData, description: e.target.value })}
@@ -326,7 +372,7 @@ export default function ProductForm() {
             ) : (
               <div className="flex items-center gap-3">
                 <Save size={20} />
-                <span>{id ? 'Apply Refinements' : 'Publish Product'}</span>
+                <span>{id ? `Apply Refinements` : (isService ? 'Publish Service' : 'Publish Product')}</span>
               </div>
             )}
           </Button>

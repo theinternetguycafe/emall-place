@@ -9,14 +9,24 @@ import { useLocation } from 'react-router-dom'
 export default function ScrollToTop() {
   const { pathname } = useLocation()
 
+  // Disable browser's automatic scroll restoration to ensure we always start at top
   useEffect(() => {
-    window.scrollTo(0, 0)
-  }, [pathname])
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+  }, []);
 
-  // Also scroll to top on component mount (browser reload)
   useEffect(() => {
-    window.scrollTo(0, 0)
-  }, [])
+    // Immediate scroll
+    window.scrollTo(0, 0);
+    
+    // Backup scroll in case of slow rendering or browser override
+    const scrollRaf = requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+    });
+    
+    return () => cancelAnimationFrame(scrollRaf);
+  }, [pathname])
 
   return null
 }

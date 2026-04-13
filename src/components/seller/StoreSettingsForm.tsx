@@ -82,7 +82,7 @@ export default function StoreSettingsForm({ store, onSaved }: StoreSettingsFormP
       const { data, error } = await supabase
         .from('products')
         .select('*, product_images(*)')
-        .eq('seller_store_id', store.id)
+        .eq('seller_id', store.id)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -187,34 +187,45 @@ export default function StoreSettingsForm({ store, onSaved }: StoreSettingsFormP
         bannerUrl = await uploadFile(bannerFile, 'store-banners')
       }
 
-      const { data, error } = await supabase
-        .from('seller_stores')
+      const { data: profileData, error: profileError } = await supabase
+        .from('seller_profiles')
         .update({
           store_name: formData.store_name,
-          tagline: formData.tagline,
-          description: formData.description,
           seller_phone: formData.seller_phone,
           seller_email: formData.seller_email,
-          seller_location: formData.seller_location,
+          address: formData.seller_location,
+        })
+        .eq('id', store.id)
+        .select()
+        .single()
+        
+      if (profileError) throw profileError
+
+      const { data: storeData, error: storeError } = await supabase
+        .from('stores')
+        .upsert({
+          seller_id: store.id,
+          tagline: formData.tagline,
+          description: formData.description,
           announcement_text: formData.announcement_text,
           theme_color: formData.theme_color,
           logo_url: logoUrl,
           banner_url: bannerUrl,
           store_policies: policies,
           featured_product_ids: featuredProductIds,
-        })
-        .eq('id', store.id)
+        }, { onConflict: 'seller_id' })
         .select()
         .single()
 
-      if (error) {
-        throw error
+      if (storeError) {
+        throw storeError
       }
 
+      const mergedData = { ...profileData, ...storeData };
       setSuccessMessage('Store settings updated successfully!')
       setLogoFile(null)
       setBannerFile(null)
-      onSaved?.(data)
+      onSaved?.(mergedData)
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err: any) {
       console.error('Error saving settings:', err)

@@ -87,7 +87,10 @@ export default function SellerOnboardingWizard() {
     }
 
     import('mapbox-gl').then((mapboxgl) => {
-      mapboxgl.default.accessToken = MAPBOX_TOKEN
+      // Prevent race condition if user leaves the step before import finishes
+      if (!mapContainerRef.current) return
+      
+      mapboxgl.default.accessToken = MAPBOX_TOKEN;
       mapboxglRef.current = mapboxgl.default
       
       const map = new mapboxgl.default.Map({
@@ -262,75 +265,152 @@ export default function SellerOnboardingWizard() {
       return
     }
 
-    if (!user || (!docFile && currentStep === 'terms') || !selfieFile) {
-      setError('Missing information.')
+    if (!user) {
+      setError('Not authenticated. Please refresh and sign in again.')
       return
     }
 
     setLoading(true)
     setError(null)
+
+    // Strict validation before finalizing to prevent silent skipping
+    if (!docFile || !selfieFile) {
+      setError('Please complete the ID Verification (KYC) step and upload your documents.')
+      setLoading(false)
+      setCurrentStep('kyc')
+      return
+    }
+
     try {
-      // 1. Upload files
-      const docPath = `${user.id}/${Date.now()}_id_doc`
-      const selfiePath = `${user.id}/${Date.now()}_selfie`
+      // ── Phase 1: Upload KYC Files ──────────────────────────────────────
+      let docUrl = ''
+      let selfieUrl = ''
 
-      const { error: docError } = await supabase.storage.from('kyc-documents').upload(docPath, docFile!)
-      if (docError) throw new Error("Failed to upload ID Doc: " + docError.message)
+      if (docFile && selfieFile) {
+        const ts = Date.now()
+        const docPath = `${user.id}/${ts}_id_doc`
+        const selfiePath = `${user.id}/${ts}_selfie`
 
-      const { error: selfieError } = await supabase.storage.from('kyc-documents').upload(selfiePath, selfieFile!)
-      if (selfieError) throw new Error("Failed to upload selfie: " + selfieError.message)
+        const { error: docError } = await supabase.storage.from('kyc-documents').upload(docPath, docFile)
+        if (docError) throw new Error(`ID Doc upload failed: ${docError.message}`)
 
-      const docUrl = supabase.storage.from('kyc-documents').getPublicUrl(docPath).data.publicUrl
-      const selfieUrl = supabase.storage.from('kyc-documents').getPublicUrl(selfiePath).data.publicUrl
+        const { error: selfieError } = await supabase.storage.from('kyc-documents').upload(selfiePath, selfieFile)
+        if (selfieError) throw new Error(`Selfie upload failed: ${selfieError.message}`)
 
-      // 2. Create KYC submission
-      const { error: kycError } = await supabase.from('kyc_submissions').insert({
+        // kyc-documents is a PRIVATE bucket — store the storage paths, not public URLs.
+        // The admin dashboard generates signed URLs on-demand from these paths.
+        docUrl = docPath
+        selfieUrl = selfiePath
+
+        // ── Phase 2: Submit KYC record ─────────────────────────────────────
+        const { error: kycError } = await supabase.from('kyc_submissions').insert({
+          user_id: user.id,
+          id_number: idNumber,
+          document_url: docUrl,
+          selfie_url: selfieUrl,
+          status: 'pending'
+        })
+        if (kycError) {
+          console.error('[Onboarding] KYC insert error:', kycError)
+          // Don't block store creation if only kyc_submissions table is missing
+          if (kycError.code !== '42P01') { // 42P01 = table does not exist
+            throw new Error(`Failed to submit KYC: ${kycError.message}`)
+          }
+        }
+      }
+
+      // ── Phase 3a: Core seller_profiles upsert (Identity) ─────────────────
+      const storeSlugBase = storeName ? storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'store'
+      const storeSlug = `${storeSlugBase}-${user.id.replace(/-/g, '').substring(0, 6)}`
+
+      const identityPayload: Record<string, any> = {
         user_id: user.id,
-        id_number: idNumber,
-        document_url: docUrl,
-        selfie_url: selfieUrl,
-        status: 'pending'
-      })
-      if (kycError) throw new Error("Failed to submit KYC data")
-
-      // 3. Update Seller Store
-      const { error: storeError } = await supabase.from('seller_stores').upsert({
-        owner_id: user.id,
-        store_name: storeName,
-        description: description,
-        tagline: tagline,
-        seller_email: sellerEmail,
-        seller_phone: sellerPhone,
-        category: category,
         seller_type: sellerType,
-        latitude: location?.lat || 0,
-        longitude: location?.lng || 0,
-        address: location?.address || '',
+        onboarding_completed: true,
+        store_name: storeName || profile?.full_name + "'s Store" || 'My Store',
+        store_slug: storeSlug,
+        kyc_status: 'pending',
+        is_online: false,
+        latitude: location?.lat || null,
+        longitude: location?.lng || null,
+        address: location?.address || null,
+        seller_email: sellerEmail || null,
+        seller_phone: sellerPhone || null,
         service_mode: sellerType !== 'product' ? serviceMode : null,
         radius_km: sellerType !== 'product' ? radiusKm : null,
-        status: 'active',
-        is_verified: true, // For demo purposes, auto-verify. Real world: false.
-        kyc_status: 'pending',
-        terms_accepted: true,
-        terms_accepted_at: new Date().toISOString()
-      }, { onConflict: 'owner_id' })
+      }
 
-      if (storeError) throw new Error("Failed to save store profile")
+      const { data: sellerProfileData, error: profileError } = await supabase
+        .from('seller_profiles')
+        .upsert(identityPayload, { onConflict: 'user_id' })
+        .select('id')
+        .single()
 
-      // Success
+      if (profileError) {
+        console.error('[Onboarding] seller_profiles upsert error:', profileError)
+        throw new Error(`Failed to save seller profile: ${profileError.message} (code: ${profileError.code})`)
+      }
+
+      const sellerId = sellerProfileData?.id
+
+      // ── Phase 3b: stores (branding layer) ────
+      if (sellerId) {
+        const storePayload = {
+          seller_id: sellerId,
+          tagline: tagline || null,
+          description: description || null,
+          is_verified: false
+        }
+
+        const { error: extError } = await supabase
+          .from('stores')
+          .upsert(storePayload, { onConflict: 'seller_id' })
+
+        if (extError) {
+          console.warn('[Onboarding] stores upsert failed:', extError.message)
+        }
+      }
+
+      // ── Phase 4: Update profiles table with onboarding data ──────────────
+      try {
+        const profilePayload: Record<string, any> = { role: 'seller' }
+        if (sellerPhone) profilePayload.phone = sellerPhone
+        if (location?.address) {
+          // Try to extract municipality from address parts
+          const addrParts = (location?.address || '').split(',')
+          if (addrParts.length >= 2) {
+            profilePayload.municipality = addrParts[addrParts.length - 2]?.trim() || ''
+          }
+        }
+        if (Object.keys(profilePayload).length > 0) {
+          await supabase.from('profiles').update(profilePayload).eq('id', user.id)
+        }
+      } catch (profileErr) {
+        console.warn('[Onboarding] Profile update failed (non-blocking):', profileErr)
+      }
+
+      // ── Success: Update cached verification state before redirecting ───
+      // This is critical: ProtectedRoute checks isVerified from cached profile.
+      // If we don't update this, the reload will see isVerified=false and
+      // redirect right back to /seller/onboarding.
+      try {
+        localStorage.setItem('cached_verified', 'true')
+      } catch (e) {
+        console.warn('[Onboarding] Failed to update verification cache:', e)
+      }
+
       setCurrentStep('completion')
-      
-      // Auto redirect after a few seconds
       setTimeout(() => {
-         window.location.href = '/#/seller'
-         window.location.reload()
+         navigate('/seller', { replace: true })
       }, 3000)
 
     } catch (err: any) {
-      console.error(err)
+      console.error('[Onboarding] handleFinish error:', err)
       let msg = err.message || 'An error occurred while saving your profile.'
-      if (msg.includes('Bucket not found')) {
-        msg = 'ID Storage Bucket not found. Please run the setup_kyc_bucket.sql script in your Supabase SQL Editor to create it.'
+      if (msg.includes('Bucket not found') || msg.includes('bucket not found')) {
+        msg = 'KYC storage bucket not found. Please run FIX_SELLER_STORES_FULL.sql in your Supabase SQL Editor.'
+      } else if (msg.includes('42P01') || msg.includes('does not exist')) {
+        msg = 'Database table missing. Please run FIX_SELLER_STORES_FULL.sql in your Supabase SQL Editor first.'
       }
       setError(msg)
     } finally {

@@ -45,7 +45,7 @@ export default function SalesManagement({ isAdmin }: SalesManagementProps) {
     try {
       let query = supabase
         .from('products')
-        .select('*, seller_store:seller_store_id(*)')
+        .select('*, seller_store:seller_profiles(*)')
         .order('created_at', { ascending: false })
 
       // If not admin, only show approved products. 

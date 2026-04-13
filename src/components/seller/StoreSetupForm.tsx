@@ -56,7 +56,10 @@ export function StoreSetupForm({
             </div>
             {!editingStore && (
               <Button
-                onClick={() => setEditingStore(true)}
+                onClick={() => {
+                  setEditingStore(true)
+                  setTimeout(() => document.getElementById('store-setup-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+                }}
                 className="rounded-2xl bg-amber-600 hover:bg-amber-700 text-white shadow-lg shadow-amber-200 border-none px-6 py-6"
               >
                 Complete Now
@@ -75,7 +78,10 @@ export function StoreSetupForm({
             </div>
             {!editingStore && (
               <button
-                onClick={() => setEditingStore(true)}
+                onClick={() => {
+                  setEditingStore(true)
+                  setTimeout(() => document.getElementById('store-setup-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+                }}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-stone-50 text-slate-900 text-xs font-black uppercase tracking-widest hover:bg-stone-100 transition-all border border-stone-100"
               >
                 <Edit2 className="h-4 w-4" /> Edit Profile
@@ -155,7 +161,7 @@ export function StoreSetupForm({
               </div>
             </div>
           ) : (
-            <form onSubmit={updateStore} className="animate-in fade-in duration-500">
+            <form id="store-setup-form" onSubmit={updateStore} className="animate-in fade-in duration-500">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
                 
                 {/* Branding Section */}
