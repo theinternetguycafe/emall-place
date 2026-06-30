@@ -53,19 +53,8 @@ serve(async (req) => {
     }
 
     // 2. Check stock
-    if ((product.stock ?? 0) < quantity) {
+    if (product.stock < quantity) {
       return responseJson({ error: "Insufficient stock" }, 400);
-    }
-
-    // 2b. Resolve seller_profiles.id from seller_stores.owner_id
-    let sellerProfileId: string | null = null;
-    if (product.seller_stores?.owner_id) {
-      const { data: sp } = await supabase
-        .from("seller_profiles")
-        .select("id")
-        .eq("user_id", product.seller_stores.owner_id)
-        .maybeSingle();
-      sellerProfileId = sp?.id ?? null;
     }
 
     // 3. Get or create buyer profile
@@ -102,7 +91,7 @@ serve(async (req) => {
         buyer_id: buyerProfile.id,
         buyer_phone: buyer_phone,
         product_id: product_id,
-        seller_id: sellerProfileId,
+        seller_id: product.seller_stores?.owner_id,
         quantity: quantity,
         unit_price: product.price,
         subtotal: subtotal,
@@ -133,25 +122,19 @@ serve(async (req) => {
       item_status: "pending",
     });
 
-    // 7. Generate Yoco payment URL (direct API call — no user auth needed)
-    const yocoCheckout = await generateYocoCheckout({
+    // 7. Generate PayFast payment URL
+    const paymentUrl = generatePayFastUrl({
       order_id: order.id,
       amount: totalAmount,
       description: `${product.title} x${quantity}`,
     });
 
-    const paymentUrl = yocoCheckout?.redirectUrl
-      ?? `${Deno.env.get("APP_URL") || "https://emallplace.com"}/#/checkout?order_id=${order.id}&provider=yoco`;
-
     // 8. Store payment record
     await supabase.from("payments").insert({
       order_id: order.id,
-      provider: "yoco",
+      provider: "payfast",
       status: "pending",
       payment_url: paymentUrl,
-      payment_reference: yocoCheckout?.checkoutId ?? null,
-      amount: totalAmount,
-      currency: "ZAR",
     });
 
     // 9. Update conversation state
@@ -203,62 +186,28 @@ After payment, seller will contact you.`.trim();
 // Helpers
 // ============================================================
 
-/**
- * Calls the Yoco Checkouts API directly using the secret key.
- * Returns the hosted payment page URL (redirectUrl) + checkout ID.
- * No user authentication required — safe for bot/service-role flows.
- */
-async function generateYocoCheckout(options: {
+function generatePayFastUrl(options: {
   order_id: string;
-  amount: number; // in ZAR (Rands)
+  amount: number;
   description: string;
-}): Promise<{ redirectUrl: string; checkoutId: string } | null> {
-  const yocoSecretKey = Deno.env.get("YOCO_SECRET_KEY")?.trim();
+}): string {
+  const merchantId = Deno.env.get("PAYFAST_MERCHANT_ID") || "10000100";
+  const merchantKey = Deno.env.get("PAYFAST_MERCHANT_KEY") || "46f1cd6dfb60d9bbe94f3fa1433eb2b1";
   const appUrl = Deno.env.get("APP_URL") || "https://emallplace.com";
 
-  if (!yocoSecretKey?.startsWith("sk_")) {
-    console.error("[YOCO] YOCO_SECRET_KEY not configured or invalid — falling back to app checkout URL");
-    return null;
-  }
+  const params = new URLSearchParams({
+    merchant_id: merchantId,
+    merchant_key: merchantKey,
+    return_url: `${appUrl}/payment-success`,
+    cancel_url: `${appUrl}/payment-cancelled`,
+    notify_url: `${supabaseUrl}/functions/v1/payfast-webhook`,
+    m_payment_id: options.order_id,
+    amount: options.amount.toFixed(2),
+    item_name: options.description,
+    custom_str1: "whatsapp",
+  });
 
-  const amountInCents = Math.round(options.amount * 100);
-
-  const payload = {
-    amount: amountInCents,
-    currency: "ZAR",
-    externalId: options.order_id,
-    successUrl: `${appUrl}/payment-success?order_id=${options.order_id}`,
-    cancelUrl: `${appUrl}/payment-cancelled?order_id=${options.order_id}`,
-    failureUrl: `${appUrl}/payment-failed?order_id=${options.order_id}`,
-    metadata: {
-      orderId: options.order_id,
-      description: options.description,
-      channel: "whatsapp",
-    },
-  };
-
-  try {
-    const resp = await fetch("https://payments.yoco.com/api/checkouts", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${yocoSecretKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const json = await resp.json();
-    if (!resp.ok) {
-      console.error("[YOCO] Checkout creation failed:", json);
-      return null;
-    }
-
-    console.log("[YOCO] Checkout created:", json.id);
-    return { redirectUrl: json.redirectUrl, checkoutId: json.id };
-  } catch (err: any) {
-    console.error("[YOCO] Fetch error:", err.message);
-    return null;
-  }
+  return `https://www.payfast.co.za/eng/process?${params.toString()}`;
 }
 
 async function sendWhatsAppMessage(to: string, text: string): Promise<void> {

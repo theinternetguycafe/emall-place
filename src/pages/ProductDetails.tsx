@@ -131,11 +131,13 @@ export default function ProductDetails() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
         {/* Image Gallery */}
         <div className="lg:col-span-7 space-y-6">
-          <Card className="p-0 border-none bg-stone-100 overflow-hidden rounded-3xl aspect-square relative group">
+          <Card className="p-0 border-none bg-stone-100 overflow-hidden rounded-3xl aspect-square relative group flex items-center justify-center">
             <ProductImage
               src={allImages[selectedImage]?.url}
               alt={product.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+              className="w-full h-full group-hover:scale-105 transition-transform duration-700"
+              imgClassName="object-contain"
+              transformOptions={{ width: 800, quality: 85, format: 'webp' }}
             />
             {saleInfo.isOnSale && (
               <SaleBadge label={saleInfo.saleLabel || `${saleInfo.discountPercent}% OFF`} className="top-6 right-6" />
@@ -157,7 +159,7 @@ export default function ProductDetails() {
                     selectedImage === idx ? 'border-slate-900 ring-4 ring-slate-900/5' : 'border-transparent opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <ProductImage src={img.url} alt="" className="w-full h-full object-cover" />
+                  <ProductImage src={img.url} alt="" className="w-full h-full" imgClassName="object-contain" />
                 </button>
               ))}
             </div>

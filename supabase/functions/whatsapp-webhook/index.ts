@@ -20,25 +20,13 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // MAIN WEBHOOK HANDLER
 // ============================================================
 serve(async (req) => {
-  const url = new URL(req.url);
-
-  // ✅ META WEBHOOK VERIFICATION
-  if (req.method === "GET") {
-    const mode = url.searchParams.get("hub.mode");
-    const token = url.searchParams.get("hub.verify_token");
-    const challenge = url.searchParams.get("hub.challenge");
-
-    const VERIFY_TOKEN = "emallplace_verify";
-
-    if (mode === "subscribe" && token === VERIFY_TOKEN) {
-      return new Response(challenge, { status: 200 });
-    } else {
-      return new Response("Forbidden", { status: 403 });
+  try {
+    // Webhook verification (GET)
+    if (req.method === "GET") {
+      return handleGetRequest(req);
     }
-  }
 
-  // 👇 KEEP YOUR EXISTING POST LOGIC BELOW
-  try {    // Message handler (POST)
+    // Message handler (POST)
     if (req.method === "POST") {
       return await handlePostRequest(req);
     }
@@ -51,7 +39,23 @@ serve(async (req) => {
   }
 });
 
+// ============================================================
+// GET: Webhook Verification
+// ============================================================
+function handleGetRequest(req: Request): Response {
+  const { searchParams } = new URL(req.url);
+  const mode = searchParams.get("hub.mode");
+  const token = searchParams.get("hub.verify_token");
+  const challenge = searchParams.get("hub.challenge");
 
+  if (mode === "subscribe" && token === WHATSAPP_VERIFY_TOKEN) {
+    console.log("[WHATSAPP] ✅ Webhook verified");
+    return new Response(challenge, { status: 200 });
+  }
+
+  console.log("[WHATSAPP] ❌ Verification failed");
+  return new Response("Verification failed", { status: 403 });
+}
 
 // ============================================================
 // POST: Message Handler
@@ -168,7 +172,7 @@ async function handleBuyerMessage(
 
   // Step 3: Get or create conversation
   let { data: conversation } = await supabase
-    .from("whatsapp_conversations")
+    .from("conversations")
     .select("id, state")
     .eq("buyer_phone", buyerPhone)
     .eq("product_id", productId)
@@ -177,20 +181,18 @@ async function handleBuyerMessage(
     .maybeSingle();
 
   if (!conversation) {
-    // Create new conversation — store buyer_name and seller_phone
-    // for faster routing with fewer joins later
-    const seller = product.seller_stores?.[0]?.seller_profiles?.[0];
+    // Create new conversation
+    const seller =
+      product.seller_stores?.[0]?.seller_profiles?.[0];
 
     const { data: newConv, error: convError } = await supabase
-      .from("whatsapp_conversations")
+      .from("conversations")
       .insert({
         buyer_phone: buyerPhone,
         product_id: productId,
         seller_id: seller?.id,
-        seller_phone: seller?.whatsapp_number ?? null,
         status: "active",
         state: "VIEWING_PRODUCT",
-        last_message_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -209,19 +211,23 @@ async function handleBuyerMessage(
       reference_type: "conversation",
       message: `Buyer inquired about: ${product.title}`,
       actor_type: "buyer",
+      actor_id: null,
       metadata: { product_id: productId, buyer_phone: buyerPhone },
     });
 
-    console.log(`[CONVERSATION] Created ${conversation.id} for ${buyerPhone}`);
+    console.log(
+      `[CONVERSATION] Created ${conversation.id} for ${buyerPhone}`
+    );
   }
 
   // Step 4: Store incoming message
   const { error: msgError } = await supabase
-    .from("whatsapp_messages")
+    .from("messages")
     .insert({
       conversation_id: conversation.id,
       sender: "buyer",
       message: messageText,
+      metadata: { message_id: messageId },
     });
 
   if (msgError) {
@@ -262,30 +268,19 @@ async function handleBuyNow(
 ): Promise<string> {
   try {
     const { data: conversation } = await supabase
-      .from("whatsapp_conversations")
+      .from("conversations")
       .select("*")
       .eq("id", conversationId)
       .single();
 
-    // Resolve seller_profiles.id via owner_id
-    let sellerProfileId: string | null = null;
-    const ownerUserId = product.seller_stores?.[0]?.owner_id;
-    if (ownerUserId) {
-      const { data: sp } = await supabase
-        .from("seller_profiles")
-        .select("id")
-        .eq("user_id", ownerUserId)
-        .maybeSingle();
-      sellerProfileId = sp?.id ?? null;
-    }
-
-    // Create order — link conversation_id for full traceability
+    // Create order
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
         conversation_id: conversationId,
         product_id: product.id,
-        seller_id: sellerProfileId,
+        seller_id:
+          product.seller_stores?.[0]?.seller_profiles?.[0]?.id,
         buyer_phone: conversation.buyer_phone,
         status: "pending",
         payment_status: "unpaid",
@@ -307,32 +302,29 @@ async function handleBuyNow(
 
     // Update conversation state
     await supabase
-      .from("whatsapp_conversations")
+      .from("conversations")
       .update({ state: "AWAITING_PAYMENT" })
       .eq("id", conversationId);
 
-    // Generate Yoco payment link (direct API — no user auth needed)
-    const yocoCheckout = await generateYocoCheckout({
-      order_id: order.id,
-      amount: product.price,
-      description: product.title,
-    });
+    // Create payment record (Yoco)
+    const paymentLink = generateYocoLink(order);
 
-    const paymentLink = yocoCheckout?.redirectUrl
-      ?? `${Deno.env.get("APP_URL") || "https://emallplace.com"}/#/checkout?order_id=${order.id}&provider=yoco`;
-
-    // Store payment record
-    await supabase
+    const { data: payment, error: paymentError } = await supabase
       .from("payments")
       .insert({
         order_id: order.id,
         provider: "yoco",
         status: "pending",
         payment_url: paymentLink,
-        payment_reference: yocoCheckout?.checkoutId ?? null,
         amount: product.price,
         currency: "ZAR",
-      });
+      })
+      .select()
+      .single();
+
+    if (paymentError) {
+      console.error("[PAYMENT CREATE ERROR]", paymentError);
+    }
 
     // Log event
     await logSystemEvent({
@@ -341,6 +333,7 @@ async function handleBuyNow(
       reference_type: "order",
       message: `Order created for ${product.title}`,
       actor_type: "bot",
+      actor_id: null,
       metadata: { amount: product.price },
     });
 
@@ -366,7 +359,7 @@ async function handleAskSeller(
 ): Promise<string> {
   // Update conversation state
   await supabase
-    .from("whatsapp_conversations")
+    .from("conversations")
     .update({ state: "WAITING_FOR_SELLER" })
     .eq("id", conversationId);
 
@@ -385,7 +378,7 @@ async function handleAskSeller(
     product.seller_stores?.[0]?.seller_profiles?.[0]?.whatsapp_number;
   if (sellerPhone) {
     const { data: conversation } = await supabase
-      .from("whatsapp_conversations")
+      .from("conversations")
       .select("*")
       .eq("id", conversationId)
       .single();
@@ -422,7 +415,7 @@ async function handleSellerMessage(
 
   // Get pending conversation (waiting for seller response)
   const { data: conversation } = await supabase
-    .from("whatsapp_conversations")
+    .from("conversations")
     .select("id, buyer_phone, state")
     .eq("seller_id", seller.id)
     .eq("state", "WAITING_FOR_SELLER")
@@ -435,10 +428,11 @@ async function handleSellerMessage(
   }
 
   // Store seller message
-  await supabase.from("whatsapp_messages").insert({
+  await supabase.from("messages").insert({
     conversation_id: conversation.id,
     sender: "seller",
     message: messageText,
+    metadata: { message_id: messageId },
   });
 
   // Forward to buyer
@@ -447,7 +441,7 @@ async function handleSellerMessage(
 
   // Update state
   await supabase
-    .from("whatsapp_conversations")
+    .from("conversations")
     .update({ state: "WAITING_FOR_BUYER" })
     .eq("id", conversation.id);
 
@@ -501,11 +495,12 @@ async function handleDriverAccept(
   driverPhone: string
 ): Promise<string> {
   try {
-    // Step 1: Get oldest waiting dispatch request
+    // Get first waiting dispatch request
     const { data: dispatchReq } = await supabase
-      .from("whatsapp_dispatch_requests")
-      .select("id, order_id, delivery_id")
+      .from("dispatch_requests")
+      .select("id, order_id, pickup_address, dropoff_address")
       .eq("status", "waiting")
+      .lt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
@@ -514,66 +509,53 @@ async function handleDriverAccept(
       return `📭 No active delivery requests at the moment.`;
     }
 
-    // Step 2: ATOMIC accept — only succeeds if status is STILL 'waiting'
-    // This prevents race conditions when multiple drivers press "1" simultaneously
-    const { data: claimed, error: claimError } = await supabase
-      .from("whatsapp_dispatch_requests")
-      .update({
-        status: "accepted",
-        accepted_by_driver_id: driverId,
-        accepted_at: new Date().toISOString(),
-      })
-      .eq("id", dispatchReq.id)
-      .eq("status", "waiting")   // ← atomic guard: only first driver wins
-      .select()
-      .maybeSingle();
-
-    if (claimError || !claimed) {
-      // Another driver got there first
-      return `⚡ Another driver just accepted this delivery. Stay tuned for the next one!`;
-    }
-
-    // Step 3: Update the existing delivery record (created by yoco-webhook)
+    // Update dispatch request
     await supabase
-      .from("whatsapp_deliveries")
-      .update({
-        driver_id: driverId,
+      .from("dispatch_requests")
+      .update({ status: "accepted" })
+      .eq("id", dispatchReq.id);
+
+    // Create delivery record
+    const { data: delivery, error: deliveryError } = await supabase
+      .from("deliveries")
+      .insert({
+        order_id: dispatchReq.order_id,
         driver_phone: driverPhone,
         status: "assigned",
+        pickup_address: dispatchReq.pickup_address,
+        dropoff_address: dispatchReq.dropoff_address,
       })
-      .eq("id", dispatchReq.delivery_id);
+      .select()
+      .single();
 
-    // Step 4: Get order for buyer notification
+    if (deliveryError) {
+      console.error("[DELIVERY CREATE ERROR]", deliveryError);
+      return `⚠️ Could not assign delivery. Try again.`;
+    }
+
+    // Get order details
     const { data: order } = await supabase
       .from("orders")
-      .select("buyer_phone, total_amount")
+      .select("*")
       .eq("id", dispatchReq.order_id)
       .single();
 
-    // Step 5: Get delivery details for addresses
-    const { data: delivery } = await supabase
-      .from("whatsapp_deliveries")
-      .select("pickup_address, dropoff_address")
-      .eq("id", dispatchReq.delivery_id)
-      .single();
+    // Notify buyer
+    const buyerMsg = `🚗 Driver assigned!\n\n📍 Pickup: ${dispatchReq.pickup_address}\n🏠 Dropoff: ${dispatchReq.dropoff_address}`;
+    await sendWhatsAppMessage(order.buyer_phone, buyerMsg);
 
-    // Step 6: Notify buyer
-    if (order?.buyer_phone) {
-      const buyerMsg = `🚗 *Driver Assigned!*\n\n👤 Driver is on the way.\n📍 Pickup: ${delivery?.pickup_address ?? "Seller store"}\n🏠 Your address will be confirmed shortly.\n\nThank you for your order! 🎉`;
-      await sendWhatsAppMessage(order.buyer_phone, buyerMsg);
-    }
-
-    // Step 7: Log event
+    // Log event
     await logSystemEvent({
       event_type: "driver_assigned",
       reference_id: dispatchReq.order_id,
       reference_type: "order",
       message: "Driver accepted delivery",
       actor_type: "driver",
-      metadata: { driver_phone: driverPhone, driver_id: driverId },
+      actor_id: null,
+      metadata: { driver_phone: driverPhone },
     });
 
-    return `✅ Delivery accepted!\n\n📍 Pickup: ${delivery?.pickup_address ?? "Seller store"}\n🏠 Dropoff: ${delivery?.dropoff_address ?? "Buyer address"}\n\nHead to pickup location. Reply:\n1️⃣ Picked up\n2️⃣ Delivered`;
+    return `✅ Delivery assigned!\n\n📍 Pickup: ${dispatchReq.pickup_address}\n🏠 Dropoff: ${dispatchReq.dropoff_address}\n\n⏰ Head to pickup location.`;
   } catch (err: any) {
     console.error("[DRIVER ACCEPT ERROR]", err.message);
     return `⚠️ Something went wrong. Try again.`;
@@ -584,62 +566,13 @@ async function handleDriverAccept(
 // UTILITIES
 // ============================================================
 
-/**
- * Calls the Yoco Checkouts API directly using the secret key.
- * Returns the hosted payment page URL + checkout ID.
- * No user authentication required — safe for bot/service-role flows.
- */
-async function generateYocoCheckout(options: {
-  order_id: string;
-  amount: number; // in ZAR (Rands)
-  description: string;
-}): Promise<{ redirectUrl: string; checkoutId: string } | null> {
-  const yocoSecretKey = Deno.env.get("YOCO_SECRET_KEY")?.trim();
+function generateYocoLink(order: any): string {
+  // Return Yoco checkout link
+  // In production, this would call the yoco-initiate edge function
+  // For WhatsApp integration, we generate a direct link
   const appUrl = Deno.env.get("APP_URL") || "https://emallplace.com";
-
-  if (!yocoSecretKey?.startsWith("sk_")) {
-    console.error("[YOCO] YOCO_SECRET_KEY not configured — falling back to app checkout URL");
-    return null;
-  }
-
-  const amountInCents = Math.round(options.amount * 100);
-
-  const payload = {
-    amount: amountInCents,
-    currency: "ZAR",
-    externalId: options.order_id,
-    successUrl: `${appUrl}/payment-success?order_id=${options.order_id}`,
-    cancelUrl: `${appUrl}/payment-cancelled?order_id=${options.order_id}`,
-    failureUrl: `${appUrl}/payment-failed?order_id=${options.order_id}`,
-    metadata: {
-      orderId: options.order_id,
-      description: options.description,
-      channel: "whatsapp",
-    },
-  };
-
-  try {
-    const resp = await fetch("https://payments.yoco.com/api/checkouts", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${yocoSecretKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const json = await resp.json();
-    if (!resp.ok) {
-      console.error("[YOCO] Checkout creation failed:", json);
-      return null;
-    }
-
-    console.log("[YOCO] Checkout created:", json.id);
-    return { redirectUrl: json.redirectUrl, checkoutId: json.id };
-  } catch (err: any) {
-    console.error("[YOCO] Fetch error:", err.message);
-    return null;
-  }
+  const checkoutUrl = `${appUrl}/#/checkout?order_id=${order.id}&provider=yoco`;
+  return checkoutUrl;
 }
 
 async function sendWhatsAppMessage(to: string, text: string): Promise<void> {
@@ -688,17 +621,13 @@ interface LogSystemEventParams {
 
 async function logSystemEvent(params: LogSystemEventParams): Promise<void> {
   try {
-    await supabase.from("whatsapp_system_logs").insert({
-      log_type: params.event_type === "conversation_created" ? "conversation_created"
-        : params.event_type === "order_created" ? "order_created"
-        : params.event_type === "message_sent" ? "message_sent"
-        : params.event_type === "driver_assigned" ? "driver_assigned"
-        : "other",
+    await supabase.from("system_logs").insert({
+      event_type: params.event_type,
       reference_id: params.reference_id,
       reference_type: params.reference_type || "system",
       message: params.message,
-      actor_type: params.actor_type || "bot",
-      actor_phone: null,
+      actor_type: params.actor_type || "system",
+      actor_id: params.actor_id || null,
       metadata: params.metadata || {},
     });
   } catch (err: any) {

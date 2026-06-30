@@ -198,7 +198,7 @@ export default function ShopMap({ products, userLocation }: any) {
                 >
                   <div className="aspect-square rounded-2xl bg-stone-50 overflow-hidden border border-stone-100 mb-3 relative">
                     {p.product_images?.[0] ? (
-                      <img src={p.product_images[0].url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      <img src={p.product_images[0].url} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-stone-300">No Image</div>
                     )}

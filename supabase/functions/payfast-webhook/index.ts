@@ -127,7 +127,7 @@ serve(async (req: Request) => {
 
             // Log dispatch creation
             await supabase.from("whatsapp_system_logs").insert({
-              log_type: "other",
+              log_type: "dispatch_created",
               reference_id: orderId,
               reference_type: "order",
               actor_type: "bot",

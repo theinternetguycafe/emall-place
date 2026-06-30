@@ -15,6 +15,7 @@ export interface NearbyService {
   service_mode: string | null
   seller_email: string | null
   seller_phone: string | null
+  whatsapp_number?: string | null
   stores: Array<{ logo_url: string | null; tagline: string | null; banner_url: string | null }>
   min_base_rate?: number
   store_slug?: string

@@ -145,8 +145,7 @@ export default function Shop() {
         .eq('status', 'approved')
         .eq('seller_store.onboarding_completed', true)
         .eq('seller_store.kyc_status', 'approved')
-        .neq('seller_store.seller_type', 'service')
-        .lt('stock', 999)
+        .gt('stock', 0)
 
       if (selectedCategory !== 'all') {
         query = query.eq('category_id', selectedCategory)
@@ -169,6 +168,7 @@ export default function Shop() {
       } else if (sortBy === 'price_desc') {
         query = query.order('price', { ascending: false })
       } else {
+        // Hybrid strategy: newest products weighted higher, but shuffled for discovery
         query = query.order('created_at', { ascending: false })
       }
 
@@ -181,8 +181,24 @@ export default function Shop() {
       
       let fetchedItems = data || []
       
-      // Proximity Sorting: Closest products first!
-      if (userLocation) {
+      // ✨ TRUE RANDOMIZATION + DISCOVERY
+      // Fisher-Yates shuffle for genuine randomness on each load
+      if (sortBy === 'newest' || sortBy === undefined) {
+        // Randomize on initial load (page 0) to show different products each visit
+        if (currentPage === 0 && fetchedItems.length > 0) {
+          // True random shuffle - different order every refresh
+          const shuffled = [...fetchedItems]
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+          }
+          fetchedItems = shuffled
+        }
+      }
+      
+      // Proximity Sorting: Closest products first! (only on map view)
+      // For main gallery: keep randomization intact
+      if (userLocation && viewMode === 'map') {
          fetchedItems.forEach((p: any) => {
            if (p.seller_store?.latitude && p.seller_store?.longitude) {
               p.distance = getDistance(userLocation.lat, userLocation.lng, p.seller_store.latitude, p.seller_store.longitude)
@@ -190,11 +206,7 @@ export default function Shop() {
               p.distance = 999999
            }
          })
-         
-         // Only sort by distance if the user isn't overriding with price sorting
-         if (sortBy !== 'price_asc' && sortBy !== 'price_desc') {
-            fetchedItems.sort((a: any, b: any) => a.distance - b.distance)
-         }
+         fetchedItems.sort((a: any, b: any) => a.distance - b.distance)
       }
       
       if (isReset) {

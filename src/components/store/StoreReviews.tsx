@@ -98,14 +98,7 @@ export default function StoreReviews({ sellerId, storeOwnerId }: StoreReviewsPro
 
       if (error) {
         console.error('[StoreReviews] Eligibility check error:', error)
-        // Fallback: check if user has ANY order from this store
-        const { data: fallback } = await supabase
-          .from('order_items')
-          .select('id, orders!inner(buyer_id)')
-          .eq('seller_id', sellerId)
-          .eq('orders.buyer_id', user.id)
-          .limit(1)
-        setHasPurchased(!!(fallback && fallback.length > 0))
+        setHasPurchased(false)
       } else {
         setHasPurchased(!!(data && data.length > 0))
       }
@@ -234,7 +227,12 @@ export default function StoreReviews({ sellerId, storeOwnerId }: StoreReviewsPro
         {/* Reviews List + Form */}
         <div className="lg:col-span-2 space-y-6">
           {/* Review Form */}
-          {user && !isOwner && !checkingEligibility && (
+          {user && !isOwner && checkingEligibility ? (
+            <Card className="p-6 border-stone-100 flex flex-col items-center justify-center gap-3 py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-stone-300" />
+              <p className="text-xs font-bold uppercase tracking-widest text-stone-400">Verifying Purchase History...</p>
+            </Card>
+          ) : user && !isOwner && !checkingEligibility && (
             <>
               {userReview ? (
                 <Card className="p-6 bg-emerald-50 border-emerald-200">

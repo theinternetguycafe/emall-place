@@ -1,9 +1,6 @@
 import React from "react";
 import { MessageCircle, Copy, Check } from "lucide-react";
 
-// Central bot number — reads from Vite env var
-const DEFAULT_BOT_PHONE = (import.meta.env.VITE_BOT_PHONE as string | undefined) || "+27000000000";
-
 interface WhatsAppShareProps {
   productId: string;
   productTitle: string;
@@ -18,7 +15,7 @@ interface WhatsAppShareProps {
 export function WhatsAppShare({
   productId,
   productTitle,
-  botPhone = DEFAULT_BOT_PHONE,
+  botPhone = process.env.REACT_APP_BOT_PHONE || "+27000000000",
 }: WhatsAppShareProps) {
   const [copied, setCopied] = React.useState(false);
 
@@ -82,7 +79,7 @@ export function WhatsAppShareCard({
   productPrice?: number;
   productImage?: string;
 }) {
-  const whatsappLink = `https://wa.me/${(botPhone || DEFAULT_BOT_PHONE)
+  const whatsappLink = `https://wa.me/${(botPhone || process.env.REACT_APP_BOT_PHONE || "+27000000000")
     .replace(/\D/g, "")}?text=${encodeURIComponent(`Hi (ID:${productId})`)}`;
 
   return (
@@ -130,7 +127,7 @@ export function ProductWhatsAppBadge({
   productTitle,
   botPhone,
 }: WhatsAppShareProps) {
-  const whatsappLink = `https://wa.me/${(botPhone || DEFAULT_BOT_PHONE)
+  const whatsappLink = `https://wa.me/${(botPhone || process.env.REACT_APP_BOT_PHONE || "+27000000000")
     .replace(/\D/g, "")}?text=${encodeURIComponent(`Hi (ID:${productId})`)}`;
 
   return (
@@ -161,7 +158,7 @@ export function ShareMenu({
 }) {
   const [isOpen, setIsOpen] = React.useState(false);
 
-  const whatsappLink = `https://wa.me/${(botPhone || DEFAULT_BOT_PHONE)
+  const whatsappLink = `https://wa.me/${(botPhone || process.env.REACT_APP_BOT_PHONE || "+27000000000")
     .replace(/\D/g, "")}?text=${encodeURIComponent(`Hi (ID:${productId})`)}`;
 
   const shareOptions = [

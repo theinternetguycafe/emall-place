@@ -68,11 +68,11 @@ export default function Layout({ children }: LayoutProps) {
                 >
                   Marketplace
                 </Link>
-                {profile?.role === 'seller' && sellerProfile?.store_slug && (
+                {profile?.role === 'seller' && sellerProfile && (
                   <Link 
-                    to={`/store/${sellerProfile.store_slug}`} 
+                    to={`/store/${sellerProfile.store_slug || sellerProfile.id}`} 
                     className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
-                      isActive(`/store/${sellerProfile.store_slug}`) ? 'text-emerald-600 bg-emerald-50 border border-emerald-200 shadow-sm' : 'text-stone-400 hover:text-slate-900 hover:bg-stone-50'
+                      isActive(`/store/${sellerProfile.store_slug || sellerProfile.id}`) ? 'text-emerald-600 bg-emerald-50 border border-emerald-200 shadow-sm' : 'text-stone-400 hover:text-slate-900 hover:bg-stone-50'
                     }`}
                   >
                     My Storefront

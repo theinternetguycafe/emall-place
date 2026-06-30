@@ -207,3 +207,17 @@ export interface StoreReview {
     full_name: string | null
   }
 }
+
+export interface ServiceBid {
+  id: string
+  request_id: string
+  seller_id: string
+  amount: number | null
+  message: string | null
+  status: 'pending' | 'accepted' | 'rejected'
+  created_at: string
+  seller_profile?: SellerProfile & {
+    stores?: Array<{ store_name: string | null; logo_url: string | null; store_slug: string | null }>
+  }
+}
+

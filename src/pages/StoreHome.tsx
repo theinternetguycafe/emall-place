@@ -64,6 +64,7 @@ export default function StoreHome() {
         tagline: storeObj.tagline,
         seller_email: spData.seller_email,
         seller_phone: spData.seller_phone,
+        whatsapp_number: spData.whatsapp_number,
         address: spData.address,
         service_mode: spData.service_mode,
         radius_km: spData.radius_km,
@@ -78,7 +79,11 @@ export default function StoreHome() {
         featured_product_ids: storeObj.featured_product_ids,
         theme_color: storeObj.theme_color,
         announcement_text: storeObj.announcement_text,
-        store_slug: spData.store_slug
+        store_slug: spData.store_slug,
+        // ── Fix: these are on seller_profiles, not the stores sub-row ──
+        average_rating: spData.rating_avg,
+        review_count: spData.rating_count,
+        created_at: spData.created_at,
       }
       setStore(mappedStore)
 
@@ -116,7 +121,7 @@ export default function StoreHome() {
               created_at: s.created_at,
               updated_at: s.updated_at || s.created_at,
               is_on_sale: false,
-              product_images: [], 
+              product_images: (storeObj.banner_url || storeObj.logo_url) ? [{ url: storeObj.banner_url || storeObj.logo_url }] : [], 
               type: 'service' // discriminator
            })) as unknown as Product[]
            
@@ -346,7 +351,7 @@ export default function StoreHome() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {store.kyc_status === 'verified' && (
+                  {(String(store.kyc_status) === 'verified' || String(store.kyc_status) === 'approved') && (
                     <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full border border-emerald-200">
                       <ShieldCheck className="w-3.5 h-3.5" /> Verified Seller
                     </span>
@@ -508,7 +513,8 @@ export default function StoreHome() {
           {(() => {
             const displayedItems = store.seller_type === 'both' 
               ? products.filter(p => {
-                  const isSvc = (p as any).type === 'service' || (p.stock ?? 0) >= 999;
+                  // Services have type === 'service' set when mapped from services table
+                  const isSvc = (p as any).type === 'service';
                   return activeTab === 'products' ? !isSvc : isSvc;
                 })
               : products;

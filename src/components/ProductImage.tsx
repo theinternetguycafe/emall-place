@@ -4,7 +4,8 @@ import { ImageOff, Loader2 } from 'lucide-react'
 interface ProductImageProps {
   src?: string
   alt: string
-  className?: string
+  className?: string        // applied to the wrapper div
+  imgClassName?: string     // applied directly to the <img> tag (for object-fit overrides)
   transformOptions?: {
     width?: number
     height?: number
@@ -21,12 +22,10 @@ function getTransformedUrl(url: string, options?: ProductImageProps['transformOp
     return url;
   }
 
-  // Ensure we don't double up on transform params if somehow already added
   if (url.includes('width=') || url.includes('height=')) {
     return url;
   }
 
-  // Re-route to the transform endpoint
   const transformBaseUrl = url.replace(
     SUPABASE_STORAGE_URL_BASE,
     SUPABASE_RENDER_URL_BASE
@@ -41,25 +40,30 @@ function getTransformedUrl(url: string, options?: ProductImageProps['transformOp
   return `${transformBaseUrl}?${params.toString()}`;
 }
 
-export default function ProductImage({ src, alt, className = "", transformOptions }: ProductImageProps) {
+export default function ProductImage({
+  src,
+  alt,
+  className = '',
+  imgClassName = '',
+  transformOptions,
+}: ProductImageProps) {
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [usingFallback, setUsingFallback] = useState(false)
 
   if (!src || error) {
     return (
-      <div className={`flex flex-col items-center justify-center bg-stone-100 text-stone-400 ${className}`}>
+      <div className={`flex flex-col items-center justify-center bg-stone-100 text-stone-400 overflow-hidden ${className}`}>
         <ImageOff className="h-10 w-10 mb-2 opacity-20" />
         <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Image Unavailable</span>
       </div>
     )
   }
 
-  // Calculate the URL to use (transformed or original fallback)
   const imageUrl = (!usingFallback && transformOptions) ? getTransformedUrl(src, transformOptions) : src;
 
   return (
-    <div className={`relative overflow-hidden bg-stone-100 ${className}`}>
+    <div className={`relative overflow-hidden bg-gradient-to-br from-stone-100 to-stone-50 ${className}`}>
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-stone-100 z-10">
           <Loader2 className="h-6 w-6 animate-spin text-slate-900" />
@@ -68,19 +72,15 @@ export default function ProductImage({ src, alt, className = "", transformOption
       <img
         src={imageUrl}
         alt={alt}
-        className={`w-full h-full object-cover transition-opacity duration-300 ${loading ? 'opacity-0' : 'opacity-100'}`}
-        onLoad={() => {
-          setLoading(false)
-          console.log('[ProductImage] Image loaded:', imageUrl)
-        }}
+        // imgClassName allows callers to override object-fit (object-cover vs object-contain)
+        className={`w-full h-full object-cover object-center transition-opacity duration-300 ${loading ? 'opacity-0' : 'opacity-100'} ${imgClassName}`}
+        onLoad={() => setLoading(false)}
         onError={() => {
           if (!usingFallback && transformOptions) {
-            console.log('[ProductImage] Transform failed, falling back to original:', src)
             setUsingFallback(true)
           } else {
             setError(true)
             setLoading(false)
-            console.error('[ProductImage] Image failed to load completely:', { src, alt })
           }
         }}
       />

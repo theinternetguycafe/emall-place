@@ -27,10 +27,12 @@ export default function ServiceCard({ service, userLocation, isSelected, onSelec
     >
       {/* 🖼️ Image Banner */}
       <div className="relative aspect-[16/10] bg-stone-100 overflow-hidden">
-        <img 
+        <ProductImage 
            src={service.seller_store?.banner_url || getStoreLogo(service.seller_store?.store_name, service.seller_store?.logo_url)}
            alt={service.title} 
-           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+           className="w-full h-full group-hover:scale-105 transition-transform duration-700"
+           imgClassName="object-cover"
+           transformOptions={{ width: 600, quality: 80, format: 'webp' }}
         />
         
         {/* Like Button */}
@@ -43,7 +45,7 @@ export default function ServiceCard({ service, userLocation, isSelected, onSelec
           <div className="bg-white/95 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg border border-white/50">
              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-0.5">Starting From</p>
              <p className="text-base font-black text-slate-900 leading-none">
-               {(service.price || service.base_price) > 0 ? `R${service.price || service.base_price}` : 'Contact for quote'}
+               {(service.price || service.base_price || 0) > 0 ? `R${service.price || service.base_price}` : 'Contact for quote'}
              </p>
           </div>
         </div>
@@ -53,10 +55,11 @@ export default function ServiceCard({ service, userLocation, isSelected, onSelec
         {/* Header Info */}
         <div className="flex items-center gap-3 mb-3">
           <div className="w-6 h-6 rounded-full overflow-hidden border border-stone-100 bg-stone-50 flex-shrink-0">
-            <img 
+            <ProductImage 
               src={getStoreLogo(service.seller_store?.store_name, service.seller_store?.logo_url)} 
               alt="" 
-              className="w-full h-full object-cover" 
+              className="w-full h-full" 
+              imgClassName="object-cover"
             />
           </div>
           <span className="text-[10px] font-black uppercase tracking-widest text-stone-400 group-hover:text-emerald-600 transition-colors">

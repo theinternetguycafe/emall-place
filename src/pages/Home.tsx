@@ -54,6 +54,7 @@ export default function Home() {
         setErrorMsg(null)
 
         // -------- PRODUCTS (match Product type shape) --------
+        // Fetch more products to allow randomization & diversity
         const { data: products, error: pError } = await supabase
           .from('products')
           .select(
@@ -88,16 +89,29 @@ export default function Home() {
           .eq('seller_store.kyc_status', 'approved')
           .neq('seller_store.store_name', 'dev test 2')
           .order('created_at', { ascending: false })
-          .limit(8)
+          .limit(50)  // Fetch 50 to allow randomization & diversity
 
         if (pError) throw pError
 
-        const safeProducts: Product[] = Array.isArray(products)
+        let fetchedItems = Array.isArray(products)
           ? products.map((p: any) => ({
               ...p,
               seller_store: Array.isArray(p.seller_store) ? p.seller_store[0] : p.seller_store,
             }))
           : [];
+
+        // ✨ TRUE RANDOMIZATION: Fisher-Yates shuffle for genuine randomness
+        if (fetchedItems.length > 0) {
+          const shuffled = [...fetchedItems]
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+          }
+          fetchedItems = shuffled
+        }
+
+        // Take top 8 after randomization
+        const safeProducts: Product[] = fetchedItems.slice(0, 8);
         setFeaturedProducts(safeProducts)
 
         // -------- CATEGORIES --------

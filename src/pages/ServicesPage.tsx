@@ -16,8 +16,6 @@ export default function ServicesPage() {
   const [selectedCoords, setSelectedCoords] = useState<{lat: number, lng: number} | null>(null);
   const [userLocation, setUserLocation] = useState<any>(null);
   const [activeRequest, setActiveRequest] = useState<any>(null);
-  
-  const loading = storeLoading && rawServices.length === 0;
   const { profile } = useAuth();
 
   // Adapt the Zustand NearbyService shape to the Product-like shape 
@@ -44,6 +42,8 @@ export default function ServicesPage() {
         description: (Array.isArray(s.stores) ? s.stores[0]?.tagline : (s.stores as any)?.tagline) || 'Professional service provider in your area.',
       }));
   }, [rawServices]);
+
+  const loading = storeLoading && services.length === 0;
 
   useEffect(() => {
     // We get initial location on mount, which will trigger fetchNearby

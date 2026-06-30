@@ -187,12 +187,12 @@ export default function OnSaleSlider({ limit = 10 }: OnSaleSliderProps) {
                 <div key={product.id} className="flex-shrink-0 w-[320px] sm:w-[450px] group">
                   <div className="bg-white rounded-[3rem] p-4 border border-stone-100 shadow-sm hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] transition-all duration-700 flex flex-col h-full relative overflow-hidden">
                     {/* Image Section */}
-                    <div className="relative aspect-[16/10] rounded-[2.5rem] overflow-hidden mb-8 shadow-inner bg-stone-100 border border-stone-50">
+                    <div className="relative aspect-[16/10] rounded-[2.5rem] overflow-hidden mb-8 shadow-inner bg-gradient-to-br from-stone-100 to-stone-50 border border-stone-100/50">
                       {product.product_images?.[0] ? (
                         <img
                           src={product.product_images[0].url}
                           alt={product.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                          className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-stone-300 bg-stone-50">

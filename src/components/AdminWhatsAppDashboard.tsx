@@ -481,7 +481,7 @@ function DispatchRow({ dispatchRequest }: { dispatchRequest: any }) {
           dispatchRequest.status === "accepted"
             ? "green"
             : dispatchRequest.status === "waiting"
-              ? "orange"
+              ? "yellow"
               : "red"
         }
       />

@@ -8,6 +8,7 @@ import { getSaleInfo } from '../utils/saleUtils'
 import SaleBadge from './SaleBadge'
 import LikeButton from './ui/LikeButton'
 import ShareSale from './ShareSale'
+import ProductImage from '../components/ProductImage'
 
 interface ProductCardProps {
   product: Product & { seller_store?: { store_name: string } }
@@ -37,12 +38,14 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
       <Link to={`/product/${product.id}`}>
         <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow duration-300 group cursor-pointer">
           {/* Image */}
-          <div className="relative h-64 bg-stone-100 overflow-hidden">
+          <div className="relative w-full aspect-square bg-gradient-to-br from-stone-100 to-stone-50 overflow-hidden flex items-center justify-center rounded-2xl border border-stone-100/50">
             {product.product_images?.[0] ? (
-              <img
+              <ProductImage
                 src={product.product_images[0].url}
                 alt={product.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                className="w-full h-full group-hover:scale-110 transition-transform duration-500"
+                imgClassName="object-cover"
+                transformOptions={{ width: 400, quality: 80, format: 'webp' }}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-stone-300">

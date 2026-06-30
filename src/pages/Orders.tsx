@@ -116,7 +116,7 @@ export default function Orders() {
           </div>
         </div>
 
-        {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
+        {error && <ErrorAlert message={error} onClose={() => {}} />}
 
         {orders.length === 0 ? (
           <Card className="text-center py-24 bg-white border-2 border-dashed border-stone-100 rounded-[2.5rem]">

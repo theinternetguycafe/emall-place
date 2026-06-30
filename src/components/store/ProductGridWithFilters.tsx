@@ -312,7 +312,7 @@ export default function ProductGridWithFilters({
                           <ProductImage
                             src={product.product_images[0].url}
                             alt={product.title}
-                            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                            className="h-full w-full object-contain transition-transform duration-700 group-hover:scale-110"
                             transformOptions={{ width: 500, quality: 75, format: 'webp' }}
                           />
                         ) : (

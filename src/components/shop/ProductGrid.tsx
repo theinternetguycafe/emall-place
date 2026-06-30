@@ -86,7 +86,7 @@ export function ProductGrid({
                     <ProductImage
                       src={product.product_images[0].url}
                       alt={product.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-1000"
                       transformOptions={{ width: 600, quality: 85, format: 'webp' }}
                     />
                   ) : (
