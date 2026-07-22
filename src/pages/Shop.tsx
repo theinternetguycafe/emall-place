@@ -15,6 +15,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { useDebounce } from '../hooks/useDebounce'
 import { Helmet } from 'react-helmet-async'
 import { ShopMap, ProductGrid, CategoryFilterBar, ShopFilters } from '../components/shop'
+import Breadcrumb from '../components/nav/Breadcrumb'
 
 // Haversine formula to calculate true geographic distance
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {

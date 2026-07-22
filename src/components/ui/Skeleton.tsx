@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
@@ -9,7 +9,8 @@ function cn(...inputs: ClassValue[]) {
 export const Skeleton = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => {
   return (
     <div
-      className={cn('animate-pulse rounded-md bg-slate-200', className)}
+      className={cn('animate-pulse motion-reduce:animate-none rounded-md bg-slate-200', className)}
+      aria-hidden="true"
       {...props}
     />
   )

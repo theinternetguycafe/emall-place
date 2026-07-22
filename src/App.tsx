@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { HashRouter as Router, Routes, Route } from 'react-router-dom'
-import 'mapbox-gl/dist/mapbox-gl.css' // Preload styles for the map
 import { AuthProvider } from './contexts/AuthContext'
 import { CartProvider } from './contexts/CartContext'
 import { ToastProvider } from './contexts/ToastContext'
@@ -18,25 +17,29 @@ import Shop from './pages/Shop'
 import Marketplace from './pages/Marketplace'
 import StoreHome from './pages/StoreHome'
 import ProductDetails from './pages/ProductDetails'
-import SellerDashboard from './pages/SellerDashboard'
-import ProductForm from './pages/ProductForm'
-import SellerOnboardingWizard from './pages/onboarding/SellerOnboardingWizard'
+const SellerDashboard = lazy(() => import('./pages/SellerDashboard'))
+const ProductForm = lazy(() => import('./pages/ProductForm'))
+const SellerOnboardingWizard = lazy(() => import('./pages/onboarding/SellerOnboardingWizard'))
 import AdminRoute from './components/auth/AdminRoute';
-import ServicesPage from './pages/ServicesPage'
+const ServicesPage = lazy(() => import('./pages/ServicesPage'))
 
 import Cart from './pages/Cart'
 
 import Checkout from './pages/Checkout'
 import CheckoutSuccess from './pages/CheckoutSuccess'
 import CheckoutCancelled from './pages/CheckoutCancelled'
-import Orders from './pages/Orders'
-import AdminDashboard from './pages/AdminDashboard'
-import AdminKYCDashboard from './pages/admin/AdminKYCDashboard'
+const Orders = lazy(() => import('./pages/Orders'))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const AdminKYCDashboard = lazy(() => import('./pages/admin/AdminKYCDashboard'))
 import HelpCentre from './pages/HelpCentre'
 import ShippingPolicy from './pages/ShippingPolicy'
 import ReturnsPolicy from './pages/ReturnsPolicy'
 import SellerGuidelines from './pages/SellerGuidelines'
 import Community from './pages/Community'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
+import Legal from './pages/Legal'
+import NotFound from './pages/NotFound'
 
 import ProtectedRoute from './components/ProtectedRoute'
 import Account from './pages/Account'
@@ -50,7 +53,6 @@ function AppContent() {
   // Preload Mapbox engine as soon as the app starts to ensure instant map availability
   useEffect(() => {
     import('mapbox-gl').then(() => {
-      if (import.meta.env.DEV) console.log('[App] Mapbox engine preloaded');
     });
   }, []);
 
@@ -77,7 +79,8 @@ function AppContent() {
       />
       <ScrollToTop />
       <Layout>
-          <Routes>
+          <Suspense fallback={<div className="flex items-center justify-center min-h-[40vh]"><div className="w-8 h-8 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" /></div>}>
+        <Routes>
           <Route 
             path="/admin/kyc" 
             element={
@@ -99,14 +102,7 @@ function AppContent() {
           <Route path="/seller-guidelines" element={<SellerGuidelines />} />
           <Route path="/community" element={<Community />} />
           
-          <Route 
-            path="/checkout" 
-            element={
-              <ProtectedRoute>
-                <Checkout />
-              </ProtectedRoute>
-            } 
-          />
+          <Route path="/checkout" element={<Checkout />} />
           <Route path="/checkout/success" element={<CheckoutSuccess />} />
           <Route path="/checkout/cancelled" element={<CheckoutCancelled />} />
           
@@ -188,7 +184,12 @@ function AppContent() {
               </ProtectedRoute>
             } 
           />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/legal" element={<Legal />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
         </Layout>
       </Router>
   )

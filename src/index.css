@@ -1,51 +1,174 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ================================================================
+   eMallPlace Collective — Design Token System
+   Brand Direction: Modern African Premium
+   ================================================================ */
+
 @layer base {
+
+  /* ── Google Fonts ── */
+  /* Outfit: primary UI font | Playfair Display: hero/display headlines */
+
   :root {
-    --background: 24 20% 97%; /* #F9F8F6 warm stone */
-    --foreground: 222 47% 11%;
+    /* ── Surfaces ── */
+    --c-bg:           #F9F8F6;
+    --c-surface:      #FFFFFF;
+    --c-surface-low:  #F2F1EE;
+
+    /* ── Primary (Midnight Slate) ── */
+    --c-primary:      #0F172A;
+    --c-primary-600:  #1E293B;
+    --c-primary-50:   #F8FAFC;
+
+    /* ── Mzansi Gold — brand accent ── */
+    --c-gold:         #C9A227;
+    --c-gold-light:   #FBF3DC;
+    --c-gold-dark:    #9B7B1B;
+
+    /* ── Impepho Green — verified / success ── */
+    --c-green:        #059669;
+    --c-green-light:  #ECFDF5;
+    --c-green-dark:   #047857;
+
+    /* ── Danger / Sale ── */
+    --c-red:          #DC2626;
+    --c-red-light:    #FEF2F2;
+    --c-red-dark:     #B91C1C;
+
+    /* ── Warning / Scarcity ── */
+    --c-orange:       #D97706;
+    --c-orange-light: #FFFBEB;
+
+    /* ── Text ── */
+    --c-text-primary:   #0F172A;
+    --c-text-secondary: #374151;
+    --c-text-tertiary:  #6B7280;
+    --c-text-disabled:  #9CA3AF;
+    --c-text-inverse:   #FFFFFF;
+
+    /* ── Borders ── */
+    --c-border:         #E7E5E4;
+    --c-border-strong:  #D6D3D1;
+    --c-border-focus:   #0F172A;
+
+    /* ── Typography Scale (7 sizes — no others permitted) ── */
+    --text-micro:      12px;   /* Metadata, badges — absolute minimum */
+    --text-caption:    13px;   /* Seller name, timestamps */
+    --text-body:       16px;   /* All descriptions, paragraphs */
+    --text-subheading: 20px;   /* Card titles, form labels */
+    --text-heading:    28px;   /* Section headings */
+    --text-title:      40px;   /* Page titles */
+    --text-display:    64px;   /* Hero only — Playfair Display italic */
+
+    /* ── Font Families ── */
+    --font-primary:  'Outfit', system-ui, -apple-system, sans-serif;
+    --font-display:  'Playfair Display', Georgia, serif;
+
+    /* ── Border Radius (5 values — no others permitted) ── */
+    --radius-sm:    8px;
+    --radius-md:    12px;
+    --radius-lg:    20px;
+    --radius-xl:    32px;
+    --radius-pill:  9999px;
+
+    /* ── Elevation / Shadows ── */
+    --shadow-sm:  0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-md:  0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+    --shadow-lg:  0 12px 32px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.04);
+    --shadow-xl:  0 24px 64px rgba(0,0,0,.12), 0 8px 16px rgba(0,0,0,.04);
+
+    /* ── Spacing Scale ── */
+    --space-1:   4px;
+    --space-2:   8px;
+    --space-3:   12px;
+    --space-4:   16px;
+    --space-6:   24px;
+    --space-8:   32px;
+    --space-12:  48px;
+    --space-16:  64px;
+
+    /* ── Motion ── */
+    --duration-instant:  100ms;
+    --duration-fast:     200ms;
+    --duration-medium:   350ms;
+    --duration-slow:     600ms;
+    --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in:    cubic-bezier(0.4, 0, 1, 1);
+    --ease-natural: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
+  /* ── Base Body ── */
   body {
-    @apply bg-[#F9F8F6] text-slate-900 antialiased;
+    background-color: var(--c-bg);
+    color: var(--c-text-primary);
+    font-family: var(--font-primary);
+    font-size: var(--text-body);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  /* ── Headings default to Outfit ── */
   h1, h2, h3, h4, h5, h6 {
-    @apply font-bold tracking-tight text-slate-900;
+    font-family: var(--font-primary);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--c-text-primary);
+    line-height: 1.15;
+  }
+
+  /* ── Display headlines use Playfair Display ── */
+  .font-display {
+    font-family: var(--font-display);
+    font-style: italic;
+  }
+
+  /* ── Reduce motion preference ── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
+/* ================================================================
+   Utility Classes
+   ================================================================ */
+
 .prose {
-  @apply max-w-none;
+  max-width: none;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-transparent;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-200 rounded-full border-4 border-transparent bg-clip-padding;
+  background-color: #D6D3D1;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-300;
+  background-color: #A8A29E;
 }
 
 /* Hide scrollbar while maintaining scrollability */
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;  /* Chrome, Safari */
+  display: none;
 }
-

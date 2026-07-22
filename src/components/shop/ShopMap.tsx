@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { X, ShoppingBag, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getStoreLogo } from "../../lib/storeUtils";

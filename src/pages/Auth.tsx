@@ -70,7 +70,6 @@ export default function Auth() {
     setError(null)
 
     try {
-      console.log('Starting auth submission:', mode, role)
       if (mode === 'signup') {
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: formData.email,
@@ -84,7 +83,6 @@ export default function Auth() {
           }
         })
 
-        console.log('SignUp response:', { hasData: !!data, hasUser: !!data?.user, hasSession: !!data?.session, error: signUpError })
 
         if (signUpError) {
           if (signUpError.status === 429) {
@@ -96,13 +94,11 @@ export default function Auth() {
         }
 
         if (data.session) {
-          console.log('Registration successful, waiting for AuthContext...')
           // For signup, we need to wait for AuthContext to complete loading
           // This ensures the profile (especially role) is loaded before redirect
           let waitCount = 0
           const maxWaits = 30 // 15 seconds max
           while (authLoading && waitCount < maxWaits) {
-            console.log(`Waiting for AuthContext... (${waitCount}/${maxWaits})`)
             await new Promise(resolve => setTimeout(resolve, 500))
             waitCount++
           }
@@ -114,11 +110,9 @@ export default function Auth() {
             navigate('/')
           }
         } else {
-          console.log('Registration successful, verification required.')
           setError('Verification email sent! Please check your inbox.')
         }
       } else {
-        console.log('Starting sign in...')
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password

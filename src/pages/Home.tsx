@@ -17,6 +17,7 @@ import { Helmet } from 'react-helmet-async'
 import ServicesSlider from '../components/home/ServicesSlider'
 import OnSaleSlider from '../components/home/OnSaleSlider'
 import { SellerCautionNote } from '../components/seller/SellerCautionNote'
+import UnifiedProductCard from '../components/UnifiedProductCard'
 
 export default function Home() {
   const navigate = useNavigate()
@@ -87,7 +88,6 @@ export default function Home() {
           .eq('status', 'approved')
           .eq('seller_store.onboarding_completed', true)
           .eq('seller_store.kyc_status', 'approved')
-          .neq('seller_store.store_name', 'dev test 2')
           .order('created_at', { ascending: false })
           .limit(50)  // Fetch 50 to allow randomization & diversity
 
@@ -175,7 +175,6 @@ export default function Home() {
           .eq('is_active', true)
           .eq('seller_store.onboarding_completed', true)
           .eq('seller_store.kyc_status', 'approved')
-          .neq('seller_store.store_name', 'dev test 2')
           .order('created_at', { ascending: false })
           .limit(6)
 
@@ -284,8 +283,9 @@ export default function Home() {
         <div className="absolute inset-0 bg-slate-950">
           <img
             src="https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&q=80&w=2070"
-            alt="Premium Marketplace"
+            alt="Premium South African Marketplace"
             className="w-full h-full object-cover opacity-60 scale-105"
+            fetchPriority="high"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
         </div>
@@ -297,7 +297,7 @@ export default function Home() {
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Proudly South African</span>
             </div>
 
-            <h1 className="text-6xl md:text-[8rem] font-black leading-[0.8] tracking-tighter mb-12 text-white uppercase italic">
+            <h1 className="font-display text-6xl md:text-[7rem] font-black leading-[0.85] tracking-tight mb-12 text-white">
               Mzansi's <br />
               <span className="text-stone-400">Finest</span> <br />
               Collective.
@@ -429,6 +429,7 @@ export default function Home() {
                       src={thumbUrl}
                       alt={category.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      loading="lazy"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = getPlaceholderImage()
                       }}
@@ -496,54 +497,10 @@ export default function Home() {
         ) : featuredProducts.length === 0 ? (
           <div className="p-10 rounded-3xl bg-stone-50 text-stone-500 border border-stone-100">No products to show yet.</div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-16">
-            {featuredProducts.map((product) => {
-              const price = Number(product.price ?? 0)
-              const stock = Number(product.stock ?? 0)
-              const imageUrl = product.product_images?.[0]?.url
-              const storeName = product.seller_store?.store_name
-
-              return (
-                <Link key={product.id} to={`/product/${product.id}`} className="group flex flex-col">
-                  <div className="aspect-square bg-white rounded-[2.5rem] overflow-hidden mb-8 relative shadow-sm border border-stone-100 group-hover:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.1)] transition-all duration-700">
-                    <ProductImage
-                      src={imageUrl}
-                      alt={product.title || 'Product'}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                    />
-
-                    <div className="absolute top-6 right-6">
-                      <LikeButton productId={product.id} className="!p-3" />
-                    </div>
-
-                    {stock <= 5 && stock > 0 && (
-                      <div className="absolute bottom-6 left-6">
-                        <Badge variant="warning" className="rounded-full px-4 py-1.5 font-black uppercase tracking-widest text-[8px] shadow-xl">
-                          Low Stock
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-400">{storeName || 'Local Seller'}</span>
-                    </div>
-
-                    <h3 className="text-xl font-bold text-slate-900 tracking-tight leading-snug group-hover:text-stone-600 transition-colors">
-                      {product.title}
-                    </h3>
-
-                    <div className="flex items-center justify-between pt-2">
-                      <p className="text-2xl font-black text-slate-900">R {price.toLocaleString()}</p>
-                      <div className="w-12 h-12 rounded-2xl bg-stone-50 flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-all duration-500">
-                        <ShoppingBag size={20} />
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              )
-            })}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">
+            {featuredProducts.map((product) => (
+              <UnifiedProductCard key={product.id} product={product} variant="grid" showAddToCart={true} showSeller={true} />
+            ))}
           </div>
         )}
       </section>

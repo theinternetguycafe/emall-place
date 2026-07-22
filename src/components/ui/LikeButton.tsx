@@ -71,7 +71,8 @@ export default function LikeButton({ productId, className = '', size = 20 }: Lik
       type="button"
       onClick={toggleLike}
       disabled={loading}
-      className={`bg-white/90 backdrop-blur-md p-3 rounded-2xl transition-all shadow-sm active:scale-90 ${
+      aria-label={isLiked ? "Remove from wishlist" : "Add to wishlist"}
+      className={`min-w-[44px] min-h-[44px] bg-white/90 backdrop-blur-md p-3 rounded-2xl transition-all shadow-sm active:scale-90 flex items-center justify-center ${
         isLiked ? 'text-rose-500' : 'text-stone-300 hover:text-rose-400'
       } ${loading ? 'opacity-70' : ''} ${className}`}
     >

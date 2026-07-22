@@ -13,6 +13,7 @@ import LikeButton from '../components/ui/LikeButton'
 import ErrorAlert from '../components/ErrorAlert'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import Breadcrumb from '../components/nav/Breadcrumb'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Helmet } from 'react-helmet-async'
@@ -297,14 +298,8 @@ export default function StoreHome() {
             )}
 
             {/* Breadcrumb on banner */}
-            <div className="absolute top-6 left-6 z-10">
-              <nav className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-white/70">
-                <Link to="/" className="hover:text-white transition-colors">Home</Link>
-                <ChevronRight className="h-3 w-3" />
-                <Link to="/marketplace" className="hover:text-white transition-colors">Marketplace</Link>
-                <ChevronRight className="h-3 w-3" />
-                <span className="text-white">{store.store_name}</span>
-              </nav>
+            <div className="absolute top-2 left-4 z-10">
+              <Breadcrumb items={[{ label: "Marketplace", href: "/marketplace" }, { label: store.store_name || "Store" }]} theme="dark" />
             </div>
           </div>
 
