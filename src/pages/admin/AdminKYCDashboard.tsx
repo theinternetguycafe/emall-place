@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { SellerStore } from '../../types';
 import { CheckCircle, XCircle, Eye, Loader2, ShieldCheck, User as UserIcon, Calendar, MapPin } from 'lucide-react';
+import MarketplaceImage from '../../components/MarketplaceImage';
 
 interface KYCSubmission {
   id: string;
