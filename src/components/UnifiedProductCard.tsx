@@ -120,7 +120,7 @@ export default function UnifiedProductCard({
 
         {/* Image Container — always 4:5, always object-contain, warm-white bg */}
         <Link to={`/product/${product.id}`} className="block">
-          <div className="relative aspect-[4/5] bg-[#FAFAF8] rounded-[20px] overflow-hidden border border-stone-100 shadow-sm group-hover:shadow-lg transition-all duration-500">
+          <div className="relative aspect-[4/5] bg-[#FAFAF8] rounded-[20px] overflow-hidden border border-stone-100 shadow-sm group-hover:shadow-md group-hover:border-stone-200 transition-all duration-500">
 
             {/* Product image */}
             {imageUrl ? (

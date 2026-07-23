@@ -276,10 +276,10 @@ export default function Home() {
         <title>eMall Place Collective | South African Marketplace</title>
         <meta name="description" content="Shop directly from independent creators across Mzansi. Quality goods, fair prices, secure payments." />
       </Helmet>
-      <div className="space-y-32 pb-32">
+      <div className="space-y-20 pb-32">
       <SellerCautionNote />
       {/* HERO */}
-      <section className="relative h-[95vh] min-h-[750px] flex items-center overflow-hidden">
+      <section className="relative min-h-[60vh] md:min-h-[70vh] flex items-center overflow-hidden py-24">
         <div className="absolute inset-0 bg-slate-950">
           <img
             src="https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&q=80&w=2070"
@@ -297,13 +297,12 @@ export default function Home() {
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Proudly South African</span>
             </div>
 
-            <h1 className="font-display text-6xl md:text-[7rem] font-black leading-[0.85] tracking-tight mb-12 text-white">
-              Mzansi's <br />
-              <span className="text-stone-400">Finest</span> <br />
-              Collective.
+            <h1 className="text-4xl md:text-6xl font-black leading-tight tracking-tight mb-8 text-white">
+              Shop Local. <br />
+              <span className="font-display italic text-emerald-400 font-normal">Discover Mzansi's Best.</span>
             </h1>
 
-            <p className="text-xl md:text-2xl text-stone-300 mb-14 leading-relaxed max-w-2xl font-medium">
+            <p className="text-lg md:text-xl text-stone-300 mb-12 leading-relaxed max-w-2xl font-medium">
               Discover handpicked treasures from local creators. 
               Fresh finds, honest prices, and safe payments for everyone.
             </p>
@@ -393,11 +392,11 @@ export default function Home() {
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8 border-b border-stone-100 pb-12">
           <div className="max-w-2xl">
             <Badge variant="outline" className="mb-4 border-emerald-200 text-emerald-600 bg-emerald-50 rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest">
-              Fresh Finds
+              Browse
             </Badge>
             <h2 className="text-5xl md:text-6xl font-black tracking-tight text-slate-900 uppercase leading-[0.9]">
-              The <br />
-              <span className="text-stone-300">Top Picks</span>
+              Explore <br />
+              <span className="text-stone-300">Categories</span>
             </h2>
           </div>
 
@@ -424,15 +423,13 @@ export default function Home() {
               const thumbUrl = categoryThumbnails[category.id] || getPlaceholderImage()
               return (
                 <Link key={category.id} to={`/marketplace?category=${category.id}`} className="group flex flex-col items-center flex-shrink-0 w-32 sm:w-40">
-                  <div className="w-full aspect-[4/5] rounded-[2.5rem] bg-stone-100 mb-6 overflow-hidden relative border border-stone-200 shadow-sm group-hover:shadow-lg transition-all duration-300">
-                    <img
+                  <div className="w-full aspect-[4/5] rounded-[2.5rem] bg-[#FAFAF8] border border-stone-100 shadow-sm transition-all duration-300 overflow-hidden relative mb-6">
+                    <MarketplaceImage
                       src={thumbUrl}
                       alt={category.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                      loading="lazy"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = getPlaceholderImage()
-                      }}
+                      className="w-full h-full group-hover:scale-105 transition-transform duration-700"
+                      imgClassName="object-contain"
+                      transformOptions={{ width: 300, quality: 80, format: 'webp' }}
                     />
                   </div>
                   <span className="font-black text-slate-900 uppercase tracking-widest text-xs group-hover:text-stone-500 transition-colors text-center line-clamp-2">
@@ -454,11 +451,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SERVICES SLIDER */}
-      <ServicesSlider services={featuredServices} />
 
-      {/* ON SALE SLIDER */}
-      <OnSaleSlider />
 
       {/* FEATURED PRODUCTS */}
       <section className="container mx-auto px-4">
@@ -504,6 +497,12 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* SERVICES SLIDER */}
+      <ServicesSlider services={featuredServices} />
+
+      {/* ON SALE SLIDER */}
+      <OnSaleSlider />
     </div>
 
     {/* Buyer Welcome Modal */}

@@ -294,9 +294,9 @@ export default function Shop() {
         <div className="absolute top-[10%] -right-20 w-96 h-96 bg-emerald-50/30 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-[20%] -left-20 w-72 h-72 bg-amber-50/20 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 relative z-10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 pb-16 relative z-10">
         {/* Header Area */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-12 mb-20 animate-in fade-in slide-in-from-top-8 duration-1000">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-12 mb-12 animate-in fade-in slide-in-from-top-8 duration-1000">
           <div className="max-w-2xl">
             <nav className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-stone-400 mb-8">
               <Link to="/" className="hover:text-slate-900 transition-colors">Digital Home</Link>
