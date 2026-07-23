@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { Store, ArrowRight, User, Star, ChevronLeft, ChevronRight } from 'lucide-react'
-import ProductImage from '../ProductImage'
+import MarketplaceImage from '../MarketplaceImage'
 import { getStoreLogo } from '../../lib/storeUtils'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
@@ -122,10 +122,11 @@ export default function ServicesSlider({ services }: ServicesSliderProps) {
                 
                 {/* Image Section */}
                 <div className="relative aspect-[16/10] rounded-[2.5rem] overflow-hidden mb-8 shadow-inner bg-stone-100 border border-stone-50">
-                  <img 
+                  <MarketplaceImage 
                     src={imageUrl} 
                     alt={service.title} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+                    mode="hero"
+                    className="w-full h-full group-hover:scale-105 transition-transform duration-700" 
                   />
                   {isDemo && (
                     <div className="absolute inset-0 bg-slate-900/10 backdrop-blur-[2px] flex items-center justify-center">
@@ -153,10 +154,11 @@ export default function ServicesSlider({ services }: ServicesSliderProps) {
                   <div className="flex items-center gap-3 mb-3">
                     {!isDemo && (
                       <div className="w-6 h-6 rounded-full overflow-hidden border border-stone-100 bg-stone-50 flex-shrink-0">
-                        <img 
+                        <MarketplaceImage 
                           src={getStoreLogo(service.seller_store?.store_name, service.seller_store?.logo_url)} 
                           alt="" 
-                          className="w-full h-full object-cover" 
+                          mode="avatar"
+                          className="w-full h-full" 
                         />
                       </div>
                     )}

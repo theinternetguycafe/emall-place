@@ -301,10 +301,11 @@ export default function AdminKYCDashboard() {
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Government ID Document
                     </p>
                     <div className="aspect-[3/2] rounded-3xl overflow-hidden bg-stone-100 border border-stone-100 relative group">
-                      <img 
+                      <MarketplaceImage 
                         src={selectedSub.document_url} 
                         alt="ID Doc" 
-                        className="w-full h-full object-contain"
+                        mode="gallery"
+                        className="w-full h-full"
                       />
                       <a 
                         href={selectedSub.document_url} 
@@ -323,10 +324,11 @@ export default function AdminKYCDashboard() {
                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Verification Selfie
                     </p>
                     <div className="aspect-[3/2] rounded-3xl overflow-hidden bg-stone-100 border border-stone-100 relative group">
-                      <img 
+                      <MarketplaceImage 
                         src={selectedSub.selfie_url} 
                         alt="Selfie" 
-                        className="w-full h-full object-contain"
+                        mode="gallery"
+                        className="w-full h-full"
                       />
                       <a 
                         href={selectedSub.selfie_url} 

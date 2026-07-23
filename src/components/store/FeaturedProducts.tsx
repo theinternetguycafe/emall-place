@@ -1,7 +1,7 @@
 import React from 'react'
 import { Product } from '../../types'
 import { Link } from 'react-router-dom'
-import ProductImage from '../ProductImage'
+import MarketplaceImage from '../MarketplaceImage'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Eye, Package, ShoppingBag, Zap } from 'lucide-react'
@@ -61,7 +61,7 @@ export default function FeaturedProducts({ products, isLoading }: FeaturedProduc
               <Link to={`/product/${product.id}`} className="group">
                 <div className="relative aspect-square overflow-hidden bg-stone-100">
                   {product.product_images?.[0] ? (
-                    <ProductImage
+                    <MarketplaceImage
                       src={product.product_images[0].url}
                       alt={product.title}
                       className="h-full w-full object-contain transition-transform duration-700 group-hover:scale-110"

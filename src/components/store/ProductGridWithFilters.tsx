@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Category, Product } from '../../types'
 import { Link } from 'react-router-dom'
-import ProductImage from '../ProductImage'
+import MarketplaceImage from '../MarketplaceImage'
 import { Card } from '../ui/Card'
 import { Package, Package2, DollarSign, TrendingUp, ShoppingBag, Eye, SlidersHorizontal, Tags } from 'lucide-react'
 import { Button } from '../ui/Button'
@@ -309,7 +309,7 @@ export default function ProductGridWithFilters({
                     <Link to={`/product/${product.id}`} className="group block">
                       <div className="relative aspect-square overflow-hidden bg-stone-100">
                         {product.product_images?.[0] ? (
-                          <ProductImage
+                          <MarketplaceImage
                             src={product.product_images[0].url}
                             alt={product.title}
                             className="h-full w-full object-contain transition-transform duration-700 group-hover:scale-110"

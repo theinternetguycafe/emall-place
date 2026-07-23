@@ -7,7 +7,7 @@ import { getSaleInfo } from '../utils/saleUtils'
 import SaleBadge from './SaleBadge'
 import LikeButton from './ui/LikeButton'
 import ShareSale from './ShareSale'
-import ProductImage from './ProductImage'
+import MarketplaceImage from './MarketplaceImage'
 import { useCart } from '../contexts/CartContext'
 import { useToast } from '../contexts/ToastContext'
 
@@ -87,7 +87,7 @@ export default function UnifiedProductCard({
         >
           <div className="w-16 h-16 flex-shrink-0 rounded-xl bg-[#FAFAF8] border border-stone-100 overflow-hidden flex items-center justify-center">
             {imageUrl ? (
-              <ProductImage
+              <MarketplaceImage
                 src={imageUrl}
                 alt={product.title}
                 className="w-full h-full"
@@ -124,7 +124,7 @@ export default function UnifiedProductCard({
 
             {/* Product image */}
             {imageUrl ? (
-              <ProductImage
+              <MarketplaceImage
                 src={imageUrl}
                 alt={product.title}
                 className="w-full h-full group-hover:scale-[1.03] transition-transform duration-700"

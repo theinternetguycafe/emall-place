@@ -10,6 +10,7 @@ import {
   AlertTriangle, ArrowRight, Link as LinkIcon, Settings, ShieldCheck, Heart, MessageCircle
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
+import MarketplaceImage from '../components/MarketplaceImage'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
@@ -135,7 +136,7 @@ function SellerProductEditModal({ product, onClose, onSave, isService }: { produ
             <div className="flex flex-wrap gap-3">
               {images.map(img => (
                 <div key={img.id} className="relative group w-20 h-20 rounded-xl overflow-hidden border border-stone-200">
-                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                  <MarketplaceImage src={img.url} mode="thumbnail" variant="thumbnail" className="w-full h-full" />
                   <button onClick={() => deleteImage(img.id)} className="absolute inset-0 bg-red-500/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <Trash2 className="h-4 w-4 text-white" />
                   </button>
@@ -648,14 +649,14 @@ export default function SellerDashboard() {
                     </div>
                     <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
                       <div className="group relative aspect-[4/3] bg-stone-100 rounded-3xl overflow-hidden border border-stone-200 cursor-zoom-in" onClick={() => setPreviewImage(kycSubmission.document_url)}>
-                        <img src={kycSubmission.document_url} alt="ID Document" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                        <MarketplaceImage src={kycSubmission.document_url} mode="gallery" className="w-full h-full transition-transform duration-700 group-hover:scale-110" />
                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <div className="bg-white/20 backdrop-blur-sm p-4 rounded-full text-white"><Eye className="w-6 h-6" /></div>
                         </div>
                         <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg text-slate-900 border border-stone-100">ID Document</div>
                       </div>
                       <div className="group relative aspect-[4/3] bg-stone-100 rounded-3xl overflow-hidden border border-stone-200 cursor-zoom-in" onClick={() => setPreviewImage(kycSubmission.selfie_url)}>
-                        <img src={kycSubmission.selfie_url} alt="Selfie" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                        <MarketplaceImage src={kycSubmission.selfie_url} mode="gallery" className="w-full h-full transition-transform duration-700 group-hover:scale-110" />
                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <div className="bg-white/20 backdrop-blur-sm p-4 rounded-full text-white"><Eye className="w-6 h-6" /></div>
                         </div>

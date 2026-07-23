@@ -8,6 +8,7 @@ import { Save, X, Upload, Loader2, ArrowLeft, Image as ImageIcon, Trash2 } from 
 import ErrorAlert from '../components/ErrorAlert'
 import SuccessAlert from '../components/SuccessAlert'
 import { Card } from '../components/ui/Card'
+import MarketplaceImage from '../components/MarketplaceImage'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { useOnboarding } from '../contexts/OnboardingContext'

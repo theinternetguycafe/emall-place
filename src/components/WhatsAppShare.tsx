@@ -73,11 +73,11 @@ export function WhatsAppShareCard({
   productId,
   productTitle,
   productPrice,
-  productImage,
+  MarketplaceImage,
   botPhone,
 }: WhatsAppShareProps & {
   productPrice?: number;
-  productImage?: string;
+  MarketplaceImage?: string;
 }) {
   const whatsappLink = `https://wa.me/${(botPhone || process.env.REACT_APP_BOT_PHONE || "+27000000000")
     .replace(/\D/g, "")}?text=${encodeURIComponent(`Hi (ID:${productId})`)}`;

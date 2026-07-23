@@ -4,7 +4,7 @@ import { getDistance } from "../../utils/distance";
 import { getStoreLogo } from "../../lib/storeUtils";
 import { SERVICE_DELIVERY_RATE_PER_KM } from "../../utils/hub";
 import LikeButton from "../ui/LikeButton";
-import ProductImage from "../ProductImage";
+import MarketplaceImage from "../MarketplaceImage";
 import { User, Star } from "lucide-react";
 import { WhatsAppButton } from "../ui/WhatsAppButton";
 
@@ -27,7 +27,7 @@ export default function ServiceCard({ service, userLocation, isSelected, onSelec
     >
       {/* 🖼️ Image Banner */}
       <div className="relative aspect-[16/10] bg-stone-100 overflow-hidden">
-        <ProductImage 
+        <MarketplaceImage 
            src={service.seller_store?.banner_url || getStoreLogo(service.seller_store?.store_name, service.seller_store?.logo_url)}
            alt={service.title} 
            className="w-full h-full group-hover:scale-105 transition-transform duration-700"
@@ -55,7 +55,7 @@ export default function ServiceCard({ service, userLocation, isSelected, onSelec
         {/* Header Info */}
         <div className="flex items-center gap-3 mb-3">
           <div className="w-6 h-6 rounded-full overflow-hidden border border-stone-100 bg-stone-50 flex-shrink-0">
-            <ProductImage 
+            <MarketplaceImage 
               src={getStoreLogo(service.seller_store?.store_name, service.seller_store?.logo_url)} 
               alt="" 
               className="w-full h-full" 

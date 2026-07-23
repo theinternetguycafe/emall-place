@@ -8,7 +8,7 @@ import {
   Camera, ExternalLink, Globe
 } from 'lucide-react'
 import { getStoreLogo } from '../lib/storeUtils'
-import ProductImage from '../components/ProductImage'
+import MarketplaceImage from '../components/MarketplaceImage'
 import LikeButton from '../components/ui/LikeButton'
 import ErrorAlert from '../components/ErrorAlert'
 import { Button } from '../components/ui/Button'
@@ -533,7 +533,7 @@ export default function StoreHome() {
                     {/* Image */}
                     <div className="relative aspect-square bg-stone-100 overflow-hidden flex-shrink-0">
                       {product.product_images?.[0] ? (
-                        <ProductImage
+                        <MarketplaceImage
                           src={product.product_images[0].url}
                           alt={product.title}
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"

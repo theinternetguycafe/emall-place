@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from 'lucide-react'
 import { Card } from '../components/ui/Card'
+import MarketplaceImage from '../components/MarketplaceImage'
 import { Button } from '../components/ui/Button'
 
 export default function Cart() {

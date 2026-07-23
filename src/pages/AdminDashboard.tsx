@@ -7,6 +7,7 @@ import {
   CheckCircle, Clock, Star, Zap, Filter, Activity, EyeOff, Ban, MoreVertical
 } from 'lucide-react'
 import { Card } from '../components/ui/Card'
+import MarketplaceImage from '../components/MarketplaceImage'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -175,7 +176,7 @@ function ProductEditModal({ product, onClose, onSave }: { product: AdminProduct;
             <div className="flex flex-wrap gap-3">
               {images.map(img => (
                 <div key={img.id} className="relative group w-20 h-20 rounded-xl overflow-hidden border border-stone-200">
-                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                  <MarketplaceImage src={img.url} mode="thumbnail" variant="thumbnail" className="w-full h-full" />
                   <button onClick={() => handleDeleteImage(img.id)} className="absolute inset-0 bg-red-500/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <Trash2 className="h-4 w-4 text-white" />
                   </button>

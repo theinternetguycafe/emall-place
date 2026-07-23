@@ -8,7 +8,7 @@ import { getSaleInfo } from '../utils/saleUtils'
 import SaleBadge from './SaleBadge'
 import LikeButton from './ui/LikeButton'
 import ShareSale from './ShareSale'
-import ProductImage from '../components/ProductImage'
+import MarketplaceImage from '../components/MarketplaceImage'
 
 interface ProductCardProps {
   product: Product & { seller_store?: { store_name: string } }
@@ -40,7 +40,7 @@ export default function ProductCard({ product, onAddToCart }: ProductCardProps) 
           {/* Image */}
           <div className="relative w-full aspect-square bg-gradient-to-br from-stone-100 to-stone-50 overflow-hidden flex items-center justify-center rounded-2xl border border-stone-100/50">
             {product.product_images?.[0] ? (
-              <ProductImage
+              <MarketplaceImage
                 src={product.product_images[0].url}
                 alt={product.title}
                 className="w-full h-full group-hover:scale-110 transition-transform duration-500"

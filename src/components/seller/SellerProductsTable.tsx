@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Edit2, Trash2, Package, Eye, EyeOff } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Badge } from '../ui/Badge'
-import ProductImage from '../ProductImage'
+import MarketplaceImage from '../MarketplaceImage'
 import { Product } from '../../types'
 
 interface SellerProductsTableProps {
@@ -47,7 +47,7 @@ export function SellerProductsTable({
                 <div className="flex items-center gap-4">
                   <div className="h-16 w-16 flex-shrink-0 bg-stone-100 rounded-2xl overflow-hidden border border-stone-200 flex items-center justify-center">
                     {(product as any).product_images?.[0] ? (
-                      <ProductImage 
+                      <MarketplaceImage 
                         src={(product as any).product_images[0].url} 
                         className="h-full w-full object-cover" 
                         alt=""

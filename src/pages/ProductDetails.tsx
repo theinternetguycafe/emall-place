@@ -8,7 +8,7 @@ import { ShoppingCart, ArrowLeft, Store, ShieldCheck, Truck, RefreshCw, BadgeChe
 import { getSaleInfo } from '../utils/saleUtils'
 import SaleBadge from '../components/SaleBadge'
 import SaleCountdown from '../components/SaleCountdown'
-import ProductImage from '../components/ProductImage'
+import MarketplaceImage from '../components/MarketplaceImage'
 import ErrorAlert from '../components/ErrorAlert'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
@@ -139,7 +139,7 @@ export default function ProductDetails() {
           {/* ── Image Gallery ── */}
           <div className="lg:col-span-7 space-y-4">
             <Card className="p-0 border-none bg-[#FAFAF8] overflow-hidden rounded-[20px] aspect-square relative group flex items-center justify-center">
-              <ProductImage
+              <MarketplaceImage
                 src={allImages[selectedImage]?.url}
                 alt={product.title}
                 className="w-full h-full group-hover:scale-[1.03] transition-transform duration-700"
@@ -168,7 +168,7 @@ export default function ProductDetails() {
                       selectedImage === idx ? 'border-slate-900 ring-4 ring-slate-900/5' : 'border-transparent opacity-50 hover:opacity-100'
                     }`}
                   >
-                    <ProductImage src={img.url} alt="" className="w-full h-full" imgClassName="object-contain" loading="lazy" />
+                    <MarketplaceImage src={img.url} alt="" className="w-full h-full" imgClassName="object-contain" loading="lazy" />
                   </button>
                 ))}
               </div>
