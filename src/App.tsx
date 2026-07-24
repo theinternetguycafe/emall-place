@@ -19,6 +19,7 @@ import StoreHome from './pages/StoreHome'
 import ProductDetails from './pages/ProductDetails'
 const SellerDashboard = lazy(() => import('./pages/SellerDashboard'))
 const ProductForm = lazy(() => import('./pages/ProductForm'))
+const ServiceForm = lazy(() => import('./pages/ServiceForm'))
 const SellerOnboardingWizard = lazy(() => import('./pages/onboarding/SellerOnboardingWizard'))
 import AdminRoute from './components/auth/AdminRoute';
 const ServicesPage = lazy(() => import('./pages/ServicesPage'))
@@ -92,7 +93,7 @@ function AppContent() {
           <Route path="/" element={<Home />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/shop" element={<Shop />} />
-          <Route path="/marketplace" element={<Shop />} />
+          <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/store/:storeSlug" element={<StoreHome />} />
           <Route path="/product/:id" element={<ProductDetails />} />
           <Route path="/cart" element={<Cart />} />
@@ -139,21 +140,21 @@ function AppContent() {
             } 
           />
           <Route 
-            path="/seller/services/new" 
-            element={
-              <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                <ProductForm />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/seller/services/:id/edit" 
-            element={
-              <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                <ProductForm />
-              </ProtectedRoute>
-            } 
-          />
+              path="/seller/services/new" 
+              element={
+                <ProtectedRoute allowedRoles={['seller', 'admin']}>
+                  <ServiceForm />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/seller/services/:id/edit" 
+              element={
+                <ProtectedRoute allowedRoles={['seller', 'admin']}>
+                  <ServiceForm />
+                </ProtectedRoute>
+              } 
+            />
           
           <Route 
             path="/admin" 

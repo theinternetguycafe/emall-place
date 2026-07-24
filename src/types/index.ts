@@ -57,6 +57,7 @@ export interface Category {
   name: string
   slug: string
   image_url?: string | null
+  domain_type?: 'product' | 'service' | 'both' | 'vehicle' | 'property' | 'rental' | 'digital'
 }
 
 export interface Service {

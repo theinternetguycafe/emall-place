@@ -32,134 +32,6 @@ import { useSellerOrders } from '../hooks/useSellerOrders'
 import { useOrderStatus } from '../hooks/useOrderStatus'
 
 // ─── Seller Product Edit Modal ─────────────────────────────────────────────────
-function SellerProductEditModal({ product, onClose, onSave, isService }: { product: Product & { product_images?: any[] }; onClose: () => void; onSave: () => void; isService?: boolean }) {
-  const [form, setForm] = useState({
-    title: product.title,
-    description: product.description || '',
-    price: String(product.price),
-    stock: String(product.stock),
-    is_on_sale: product.is_on_sale || false,
-    sale_price: String(product.sale_price || ''),
-    sale_label: product.sale_label || '',
-    sale_starts_at: product.sale_starts_at ? product.sale_starts_at.slice(0, 16) : '',
-    sale_ends_at: product.sale_ends_at ? product.sale_ends_at.slice(0, 16) : '',
-  })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [images, setImages] = useState<any[]>(product.product_images || [])
-
-  const handleSave = async () => {
-    if (!form.title.trim()) { setError('Title is required'); return }
-    if (!form.price || isNaN(parseFloat(form.price))) { setError('Valid price required'); return }
-    setSaving(true); setError(null)
-    try {
-      const { error } = await supabase.from('products').update({
-        title: form.title.trim(),
-        description: form.description.trim(),
-        price: parseFloat(form.price),
-        stock: parseInt(form.stock) || 0,
-        is_on_sale: form.is_on_sale,
-        sale_price: form.is_on_sale && form.sale_price ? parseFloat(form.sale_price) : null,
-        sale_label: form.sale_label || null,
-        sale_starts_at: form.is_on_sale && form.sale_starts_at ? new Date(form.sale_starts_at).toISOString() : null,
-        sale_ends_at: form.is_on_sale && form.sale_ends_at ? new Date(form.sale_ends_at).toISOString() : null,
-      }).eq('id', product.id)
-      if (error) throw error
-      onSave(); onClose()
-    } catch (err: any) { setError(err.message) } finally { setSaving(false) }
-  }
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return
-    setUploading(true)
-    try {
-      const url = await uploadProductImage(file)
-      if (!url) throw new Error('Upload failed. Check storage bucket setup.')
-      const { data } = await supabase.from('product_images').insert({ product_id: product.id, url, sort_order: images.length }).select().single()
-      if (data) setImages(prev => [...prev, data])
-    } catch (err: any) { setError(err.message) } finally { setUploading(false) }
-  }
-
-  const deleteImage = async (id: string) => {
-    await supabase.from('product_images').delete().eq('id', id)
-    setImages(prev => prev.filter(i => i.id !== id))
-  }
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 bg-white border-b border-stone-100 px-8 py-6 flex items-center justify-between rounded-t-3xl z-10">
-          <h2 className="text-xl font-black text-slate-900">Edit Product</h2>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-stone-100"><X className="h-5 w-5" /></button>
-        </div>
-        <div className="p-8 space-y-6">
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm font-medium">{error}</div>}
-          <div className="space-y-4">
-            <Input label={isService ? 'Service Name' : 'Product Title'} value={form.title} onChange={e => setForm(p => ({...p, title: e.target.value}))} />
-            <div>
-              <label className="block text-xs font-black uppercase tracking-widest text-stone-400 mb-2">Description</label>
-              <textarea rows={4} value={form.description} onChange={e => setForm(p => ({...p, description: e.target.value}))} className="w-full px-4 py-3 rounded-xl border-2 border-stone-200 bg-stone-50 focus:bg-white focus:border-slate-900 outline-none transition-all text-sm resize-none" />
-            </div>
-            <div className={`grid ${isService ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
-              <Input label={isService ? 'Base Rate / Fixed Price (R)' : 'Price (R)'} type="number" value={form.price} onChange={e => setForm(p => ({...p, price: e.target.value}))} />
-              {!isService && <Input label="Stock Quantity" type="number" value={form.stock} onChange={e => setForm(p => ({...p, stock: e.target.value}))} />}
-            </div>
-          </div>
-
-          {/* Sale Toggle */}
-          {!isService && (
-            <div className="border-t border-stone-100 pt-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-black text-slate-900 text-sm">Sale / Discount</h3>
-                  <p className="text-xs text-stone-400 mt-0.5">Put this product on sale with a custom price</p>
-                </div>
-              <button onClick={() => setForm(p => ({...p, is_on_sale: !p.is_on_sale}))} className={`relative w-14 h-7 rounded-full transition-colors duration-300 ${form.is_on_sale ? 'bg-emerald-500' : 'bg-stone-200'}`}>
-                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300 ${form.is_on_sale ? 'left-8' : 'left-1'}`} />
-              </button>
-            </div>
-            {form.is_on_sale && (
-              <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-                <Input label="Sale Price (R)" type="number" value={form.sale_price} onChange={e => setForm(p => ({...p, sale_price: e.target.value}))} />
-                <Input label="Sale Badge Label" value={form.sale_label} placeholder="e.g. WEEKEND DEAL" onChange={e => setForm(p => ({...p, sale_label: e.target.value}))} />
-                <Input label="Starts At" type="datetime-local" value={form.sale_starts_at} onChange={e => setForm(p => ({...p, sale_starts_at: e.target.value}))} />
-                <Input label="Ends At" type="datetime-local" value={form.sale_ends_at} onChange={e => setForm(p => ({...p, sale_ends_at: e.target.value}))} />
-              </div>
-            )}
-          </div>
-          )}
-
-          {/* Images */}
-          <div className="border-t border-stone-100 pt-6 space-y-4">
-            <h3 className="font-black text-slate-900 text-sm">{isService ? 'Service Images' : 'Product Images'}</h3>
-            <div className="flex flex-wrap gap-3">
-              {images.map(img => (
-                <div key={img.id} className="relative group w-20 h-20 rounded-xl overflow-hidden border border-stone-200">
-                  <MarketplaceImage src={img.url} mode="thumbnail" variant="thumbnail" className="w-full h-full" />
-                  <button onClick={() => deleteImage(img.id)} className="absolute inset-0 bg-red-500/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Trash2 className="h-4 w-4 text-white" />
-                  </button>
-                </div>
-              ))}
-              <label className={`w-20 h-20 border-2 border-dashed border-stone-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-slate-900 hover:bg-stone-50 transition-all ${uploading ? 'opacity-50' : ''}`}>
-                {uploading ? <RefreshCw className="h-5 w-5 text-stone-400 animate-spin" /> : <Upload className="h-5 w-5 text-stone-400" />}
-                <span className="text-[10px] text-stone-400 mt-1">Add</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
-              </label>
-            </div>
-          </div>
-        </div>
-        <div className="sticky bottom-0 bg-white border-t border-stone-100 px-8 py-5 flex justify-end gap-3 rounded-b-3xl">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving} className="px-8">
-            {saving ? <RefreshCw className="animate-spin h-4 w-4" /> : <><Save className="h-4 w-4 mr-2" />Save</>}
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─── Analytics helpers ─────────────────────────────────────────────────────────
 function computeAnalytics(products: Product[], orderItems: any[]) {
@@ -199,10 +71,11 @@ export default function SellerDashboard() {
   const { completeStep, celebrationPending, dismissCelebration } = useOnboarding()
   const [store, setStore] = useState<SellerStore | null>(null)
   const [products, setProducts] = useState<Product[]>([])
+  const [services, setServices] = useState<any[]>([])
   const [productLikes, setProductLikes] = useState<any[]>([])
   const [leads, setLeads] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'analytics' | 'products' | 'orders' | 'likes' | 'leads'>('analytics')
+  const [tab, setTab] = useState<'analytics' | 'products' | 'services' | 'orders' | 'likes' | 'leads'>('analytics')
   const [searchQuery, setSearchQuery] = useState('')
   const [showStoreForm, setShowStoreForm] = useState(false)
   const [storeName, setStoreName] = useState('')
@@ -396,7 +269,7 @@ export default function SellerDashboard() {
   return (
     <>
       <Helmet><title>{store.store_name} Hub | eMall Place</title></Helmet>
-      {editingProduct && <SellerProductEditModal product={editingProduct} isService={store.seller_type === 'service' || (store.seller_type === 'both' && (editingProduct?.stock ?? 0) >= 999)} onClose={() => setEditingProduct(null)} onSave={fetchData} />}
+      
       {previewImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm p-4 animate-in fade-in" onClick={() => setPreviewImage(null)}>
           <button className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors" onClick={() => setPreviewImage(null)}><X className="w-6 h-6" /></button>
@@ -828,3 +701,6 @@ export default function SellerDashboard() {
     </>
   )
 }
+
+
+

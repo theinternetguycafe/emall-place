@@ -12,6 +12,7 @@ import MarketplaceImage from '../components/MarketplaceImage'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { useOnboarding } from '../contexts/OnboardingContext'
+import { validateProductPayload, validateServicePayload } from '../lib/domainValidators'
 
 export default function ProductForm() {
   const { id } = useParams()
@@ -44,7 +45,12 @@ export default function ProductForm() {
   }, [id])
 
   const fetchCategories = async () => {
-    const { data, error } = await supabase.from('categories').select('*').order('name')
+    let query = supabase.from('categories').select('*').order('name')
+    
+    // Filter categories based on whether we are adding a product or service
+    query = query.in('domain_type', isService ? ['service', 'both'] : ['product', 'both'])
+    
+    const { data, error } = await query
     if (!error && data) setCategories(data)
   }
 
@@ -112,6 +118,20 @@ export default function ProductForm() {
 
       if (sError || !sellerProfile) throw new Error('Could not find your seller profile. Please contact support.')
 
+      // Phase 1.5: Strict Domain Validation
+      if (isService) {
+        validateServicePayload({
+          title: formData.title,
+          base_rate: parseFloat(formData.price)
+        }, sellerProfile.seller_type)
+      } else {
+        validateProductPayload({
+          title: formData.title,
+          price: parseFloat(formData.price),
+          stock: parseInt(formData.stock)
+        }, sellerProfile.seller_type)
+      }
+
       const productData = {
         seller_id: sellerProfile.id,
         title: formData.title,
@@ -169,13 +189,12 @@ export default function ProductForm() {
           } 
           
           console.log('[ProductForm] ✅ services table insert succeeded')
-          // Auto-online for service providers — ensure instant map visibility!
-          console.log('[ProductForm] Service detected. Ensuring seller is ONLINE with correct type.')
+          // Auto-online for service providers
+          console.log('[ProductForm] Service detected. Ensuring seller is ONLINE.')
           await supabase
             .from("seller_profiles")
             .update({
-              is_online: true,
-              seller_type: sellerProfile.seller_type === 'product' ? 'both' : sellerProfile.seller_type
+              is_online: true
             })
             .eq("id", sellerProfile.id)
         }

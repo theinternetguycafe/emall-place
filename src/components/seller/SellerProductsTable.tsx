@@ -10,7 +10,6 @@ interface SellerProductsTableProps {
   searchQuery: string
   deleteProduct: (id: string) => Promise<void>
   toggleProductVisibility: (p: Product) => Promise<void>
-  setEditingProduct: (p: Product) => void
   sellerType?: 'product' | 'service' | 'both'
 }
 
@@ -19,7 +18,6 @@ export function SellerProductsTable({
   searchQuery,
   deleteProduct,
   toggleProductVisibility,
-  setEditingProduct,
   sellerType
 }: SellerProductsTableProps) {
   return (
@@ -114,9 +112,11 @@ export function SellerProductsTable({
 
               <td className="px-8 py-6 text-right">
                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button size="sm" variant="ghost" className="h-10 w-10 p-0 rounded-xl text-stone-400 hover:text-slate-900 hover:bg-slate-100 transition-colors" onClick={() => setEditingProduct(product)}>
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
+                  <Link to={`/seller/products/${product.id}/edit`}>
+                    <Button size="sm" variant="ghost" className="h-10 w-10 p-0 rounded-xl text-stone-400 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  </Link>
                   <Button size="sm" variant="ghost" className={`h-10 w-10 p-0 rounded-xl ${product.status === 'approved' ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'}`} onClick={() => toggleProductVisibility(product)}>
                     {product.status === 'approved' ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
@@ -161,3 +161,4 @@ export function SellerProductsTable({
     </table>
   )
 }
+

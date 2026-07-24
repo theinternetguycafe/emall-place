@@ -551,7 +551,7 @@ export default function StoreSettingsForm({ store, onSaved }: StoreSettingsFormP
             name="shipping"
             value={policies.shipping || ''}
             onChange={handlePolicyChange}
-            placeholder="Describe your shipping policy..."
+            placeholder={store?.seller_type === 'service' ? 'Describe your travel radii, call-out fees...' : 'Describe your shipping policy...'}
             rows={3}
             className="w-full rounded-lg border border-stone-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900"
           />
@@ -599,3 +599,4 @@ export default function StoreSettingsForm({ store, onSaved }: StoreSettingsFormP
     </form>
   )
 }
+
